@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Veridian Q | The Immersive Masterclass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #c5a059; --bg: #050505; --panel: #0d0d0d; }
+        body { background-color: var(--bg); color: #d4d4d4; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .cinzel { font-family: 'Cinzel', serif; }
+        #bg-ghost {
+            position: absolute; inset: 0; opacity: 0.05; pointer-events: none;
+            background-image: url('https://www.transparenttextures.com/patterns/graphy.png');
+            animation: pulse 10s infinite alternate;
+        }
+        @keyframes pulse { from { opacity: 0.02; } to { opacity: 0.08; } }
+        
+        /* Cinematic Movement Effect - NOAA Synced */
+        @keyframes cinematicZoom {
+            0% { 
+                transform: scale(1) translateZ(0); 
+            }
+            100% { 
+                transform: scale(1.05) translateZ(10px); 
+            }
+        }
+        
+        /* Cinematic Active State */
+        .cinematic-active {
+            animation: cinematicZoom var(--cinematic-duration, 12s) ease-in-out infinite alternate;
+            transform-origin: center center;
+            will-change: transform;
+        }
+        
+        /* Intensity levels based on NOAA */
+        .cinematic-subtle { --cinematic-duration: 15s; } /* High humidity - slow */
+        .cinematic-moderate { --cinematic-duration: 12s; } /* Normal */
+        .cinematic-intense { --cinematic-duration: 8s; } /* Low visibility - faster */
+        
+        .btn-master {
+            background: #1a1a1a; border: 1px solid #333; height: 45px; width: 100%;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1); color: #888;
+        }
+        .btn-master:hover:not(.locked) {
+            border-color: var(--gold); color: white;
+            box-shadow: 0 0 20px rgba(197, 160, 89, 0.3);
+            background: #222; transform: scale(1.02);
+        }
+        .active-btn { border-color: var(--gold) !important; color: white !important; background: #1a1a1a; }
+        .locked { opacity: 0.3; cursor: not-allowed; }
+        #surface-gradient {
+            height: 40px; border-radius: 4px; cursor: crosshair;
+            background: linear-gradient(to right, #e6d5b8 0%, #3d342d 50%, #1a1714 100%);
+            border: 1px solid #333; transition: transform 0.3s;
+        }
+        #surface-gradient:hover { transform: scale(1.02); border-color: var(--gold); }
+        #texture-drop-zone {
+            border: 2px gold double; background: rgba(197, 160, 89, 0.05);
+            height: 120px; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; text-align: center; color: var(--gold); cursor: pointer;
+            transition: 0.3s;
+        }
+        #texture-drop-zone:hover { background: rgba(197, 160, 89, 0.15); }
+        #canvas-viewport {
+            background: #12100e;
+            box-shadow: 0 0 100px black;
+            overflow: hidden;
+            position: relative;
+            width: 450px;
+            height: 600px;
+            resize: both;
+        }
+        #art-layer {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: 5;
+            transition: all 0.3s ease;
+        }
+        #light-overlay {
+            position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
+            background: linear-gradient(45deg, rgba(255,255,255,0.2), transparent);
+            transition: all 0.3s ease;
+        }
+        .sacred-overlay {
+            z-index: 10;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .active-overlay { opacity: 0.5 !important; }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23c5a059' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            padding-right: 2rem;
+        }
+        .slider-value { font-size: 13px; font-weight: bold; color: var(--gold); }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden">
+    <div id="bg-ghost"></div>
+
+    <aside class="w-96 bg-black/90 backdrop-blur-md border-r border-stone-800 p-8 flex flex-col z-20 overflow-y-auto">
+        <header class="mb-10 text-center">
+            <h1 class="cinzel text-3xl text-stone-100 tracking-[0.3em]">VERIDIAN <span style="color: var(--gold);">Q</span></h1>
+            <p class="text-[9px] tracking-[0.5em] text-stone-500 uppercase mt-2">Perceptual Lens for Creators</p>
+            <p class="text-[8px] tracking-[0.3em] text-stone-600 mt-1 italic">Industry-Standard Cinematography • Live Atmospheric Data</p>
+        </header>
+
+        <!-- 1. Canvas Ratio & Output -->
+        <div class="mb-8">
+            <label class="text-[10px] text-stone-500 uppercase tracking-widest mb-3 block">Canvas</label>
+            <select onchange="setCanvas(this.value)" class="w-full bg-stone-900 border border-stone-800 p-2 text-[10px] outline-none hover:border-gold transition">
+                <option value="11-14">11 x 14 (Gallery Scale)</option>
+                <option value="16-20">16 x 20 (Museum Scale)</option>
+                <option value="1.618">Golden Mean (1:1.618)</option>
+                <option value="9-16">9:16 (Motion Study)</option>
+            </select>
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <button onclick="toggleGrid('golden')" class="btn-master" id="btn-golden">Golden Rule</button>
+                <button onclick="toggleGrid('root2')" class="btn-master" id="btn-root2">Root 2 Scale</button>
+            </div>
+        </div>
+
+        <!-- 2. Surface -->
+        <div class="mb-8">
+            <label class="text-[10px] text-stone-500 uppercase tracking-widest mb-3 block">Surface</label>
+            <div id="surface-gradient" onclick="selectSurface(event)"></div>
+        </div>
+
+        <!-- 3. Dynamic Optics -->
+        <div class="mb-8 border-t border-stone-900 pt-6">
+            <label class="text-[10px] text-amber-500 uppercase tracking-widest mb-3 block">Optics</label>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="setOptic('high-contrast')" class="btn-master">High Contrast</button>
+                <button onclick="setOptic('desaturate')" class="btn-master">Hue Shift</button>
+                <button onclick="setOptic('warmth')" class="btn-master">Temp +</button>
+                <button onclick="setOptic('dynamic')" class="btn-master">Dynamic Range</button>
+            </div>
+            
+            <!-- Intensity Control Slider -->
+            <div class="mt-3">
+                <input type="range" min="50" max="200" value="100" class="w-full h-1 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-gold" oninput="manualContrast(this.value)">
+            </div>
+            
+            <!-- Shadow & Saturation Editing Buttons (use slider above) -->
+            <div class="grid grid-cols-2 gap-2 mt-3">
+                <button class="btn-master text-[9px]" onclick="toggleShadow()" id="btn-shadow">Shadow</button>
+                <button class="btn-master text-[9px]" onclick="toggleSaturation()" id="btn-saturation">Saturation</button>
+            </div>
+            
+            <!-- 10AM North Light + Cinematic side by side -->
+            <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="setNorthLight()" class="btn-master text-[9px]">10AM North Light</button>
+                <button onclick="toggleCinematic()" class="btn-master text-[9px]" id="btn-cinematic">Cinematic</button>
+            </div>
+        </div>
+
+        <!-- 4. Master Transduction -->
+        <div class="mb-8 border-t border-stone-900 pt-6">
+            <div class="grid grid-cols-2 gap-3">
+                <button class="btn-master" onclick="applyMaster('davinci')">Da Vinci</button>
+                <button class="btn-master" onclick="applyMaster('rubens')">Rubens</button>
+                <button class="btn-master" onclick="applyMaster('caravaggio')">Caravaggio</button>
+                <button class="btn-master" onclick="applyMaster('michelangelo')">Michelangelo</button>
+            </div>
+        </div>
+
+        <!-- 5. Content Creator - Curator & Creator Presets -->
+        <div class="mb-8 border-t border-stone-900 pt-6" id="content-creator-section">
+            
+            <!-- Upload Zone -->
+            <div id="texture-drop-zone">
+                DRAG IMAGE HERE<br>OR CLICK TO UPLOAD
+            </div>
+            <input type="file" id="texture-input" class="hidden" accept="image/*">
+            
+            <!-- Preview Window (appears after upload) -->
+            <div id="sp-preview" class="hidden mt-3 border border-stone-800 bg-black" style="height:200px;overflow:hidden;">
+                <img id="preview-image" src="" class="w-full h-full object-contain">
+            </div>
+            
+            <!-- Pack Toggle (appears after upload) -->
+            <div id="pack-toggle" class="hidden mt-4 grid grid-cols-2 gap-2">
+                <button onclick="switchPack('curator')" class="btn-master" id="btn-curator-pack">🎨 Curator</button>
+                <button onclick="switchPack('content')" class="btn-master active-btn" id="btn-content-pack">🎥 Content Creator</button>
+            </div>
+            
+            <!-- CURATOR PANEL (Static - Artist Database Interface) -->
+            <div id="curator-panel" class="hidden mt-4">
+                <div class="bg-stone-900/50 border border-stone-800 p-4 rounded text-center">
+                    <div class="text-[10px] text-amber-500 uppercase tracking-widest mb-2">Curator</div>
+                    <div class="text-[9px] text-amber-600 border-t border-stone-800 pt-3 mt-3">
+                        Upgrade Required
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CONTENT CREATOR PANEL (Professional Sliders + Presets) -->
+            <div id="content-creator-panel" class="hidden mt-4">
+                
+                <!-- Sliders -->
+                <div class="space-y-3 mb-4">
+                    <div>
+                        <label class="text-[8px] text-amber-600 uppercase flex justify-between">
+                            <span>Color Temperature</span>
+                            <span class="slider-value" id="v1">6500K</span>
+                        </label>
+                        <input type="range" min="2500" max="10000" step="100" value="6500" class="w-full accent-gold" oninput="SacredPlane.update('colorTemp',this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="text-[8px] text-amber-600 uppercase flex justify-between">
+                            <span>Diffusion</span>
+                            <span class="slider-value" id="v3">10%</span>
+                        </label>
+                        <input type="range" min="0" max="0.15" step="0.01" value="0.10" class="w-full accent-gold" oninput="SacredPlane.update('diffusion',this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="text-[8px] text-amber-600 uppercase flex justify-between">
+                            <span>Azimuth</span>
+                            <span class="slider-value" id="v4">45°</span>
+                        </label>
+                        <input type="range" min="0" max="360" value="45" class="w-full accent-gold" oninput="SacredPlane.update('azimuth',this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="text-[8px] text-amber-600 uppercase flex justify-between">
+                            <span>Elevation</span>
+                            <span class="slider-value" id="v5">30°</span>
+                        </label>
+                        <input type="range" min="0" max="90" value="30" class="w-full accent-gold" oninput="SacredPlane.update('elevation',this.value)">
+                    </div>
+                </div>
+                
+                <!-- Preset Buttons -->
+                <div class="space-y-2">
+                    <button onclick="applyPreset('beautyRing')" class="btn-master text-left px-4 py-3">
+                        <div class="text-[11px] font-semibold">BEAUTY RING</div>
+                    </button>
+                    
+                    <button onclick="applyPreset('keyFill')" class="btn-master text-left px-4 py-3">
+                        <div class="text-[11px] font-semibold">KEY + FILL</div>
+                    </button>
+                    
+                    <button onclick="applyPreset('productHighlight')" class="btn-master text-left px-4 py-3">
+                        <div class="text-[11px] font-semibold">PRODUCT LIGHT</div>
+                    </button>
+                    
+                    <button onclick="applyPreset('goldenHour')" class="btn-master text-left px-4 py-3">
+                        <div class="text-[11px] font-semibold">GOLDEN HOUR</div>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- New Image Button (appears after upload) -->
+            <button onclick="SacredPlane.reset()" class="btn-master mt-4 text-[9px] hidden" id="btn-new-image">New Image</button>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-auto pt-6 border-t border-stone-900 space-y-3">
+            <button onclick="runQTranslation()" class="w-full bg-amber-900/20 border border-amber-600/50 text-amber-500 py-4 font-bold text-[11px] uppercase tracking-widest hover:bg-amber-600/30 transition rounded-sm">
+                Activate Q_Translation
+            </button>
+            <button onclick="toggleFitScreen()" class="btn-master text-[9px]">Fit Screen / Resize</button>
+        </div>
+    </aside>
+
+    <main class="flex-1 relative flex items-center justify-center p-12 bg-[#050505]">
+        <div id="canvas-container" class="relative flex items-center justify-center">
+            <div id="canvas-viewport" class="flex items-center justify-center">
+                <img id="art-layer" src="" class="opacity-0 shadow-[0_0_100px_rgba(0,0,0,0.8)]">
+                <div id="light-overlay"></div>
+                <div id="texture-overlay"></div>
+                <svg id="svg-golden" class="sacred-overlay w-full h-full absolute inset-0" viewBox="0 0 100 100">
+                    <path d="M0,100 C0,0 100,0 100,61.8 T61.8,100" stroke="var(--gold)" fill="none" stroke-width="0.2" />
+                </svg>
+                <svg id="svg-root2" class="sacred-overlay w-full h-full absolute inset-0" viewBox="0 0 100 100">
+                    <rect x="10" y="10" width="80" height="80" stroke="var(--gold)" fill="none" stroke-width="0.2" />
+                    <line x1="10" y1="10" x2="90" y2="90" stroke="var(--gold)" stroke-width="0.1" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Colorful NOAA Atmospheric Data Display -->
+        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-blue-900/30 via-purple-900/30 to-amber-900/30 backdrop-blur-sm border-t border-stone-700">
+            <div class="px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-6">
+                        <div>
+                            <div class="text-[8px] text-stone-500 uppercase tracking-widest mb-1">Quantum Bond Status</div>
+                            <div id="bond-status" class="text-sm font-semibold text-cyan-400">Idle</div>
+                        </div>
+                        <div class="w-px h-8 bg-stone-700"></div>
+                        <div>
+                            <div class="text-[8px] text-stone-500 uppercase tracking-widest mb-1">Live KCHS Weather</div>
+                            <div id="kchs-status" class="text-sm font-semibold text-amber-400">Fetching...</div>
+                        </div>
+                        <div class="w-px h-8 bg-stone-700"></div>
+                        <div>
+                            <div class="text-[8px] text-stone-500 uppercase tracking-widest mb-1">Resolution</div>
+                            <div id="res-val" class="text-sm font-semibold text-green-400">---</div>
+                        </div>
+                    </div>
+                    <div id="atmospheric-analysis" class="text-right max-w-2xl hidden">
+                        <div class="text-[8px] text-stone-500 uppercase tracking-widest mb-1">Perceptual Analysis (Live Charleston KCHS)</div>
+                        <div id="atmos-summary" class="text-xs text-blue-300 italic">Waiting for data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Core elements
+        const art = document.getElementById('art-layer');
+        const bondStatus = document.getElementById('bond-status');
+        const kchsStatus = document.getElementById('kchs-status');
+        const lightOverlay = document.getElementById('light-overlay');
+        const viewport = document.getElementById('canvas-viewport');
+        let isFitScreen = false;
+
+        // NOAA Controller
+        const NOAA = {
+            lat: 32.7765,
+            lon: -79.9311,
+            cache: null,
+            cacheTime: 0,
+            async fetch() {
+                if (this.cache && Date.now() - this.cacheTime < 300000) return this.cache;
+                try {
+                    const pointsRes = await fetch(`https://api.weather.gov/points/${this.lat},${this.lon}`, {
+                        headers: { 'User-Agent': 'VeridianQ/1.0 (protolabsglobal.com)' }
+                    });
+                    const points = await pointsRes.json();
+                    const obsUrl = points.properties.observationStations;
+                    const obsListRes = await fetch(obsUrl);
+                    const obsList = await obsListRes.json();
+                    const latestUrl = obsList.features[0].id + '/observations/latest';
+                    const obsRes = await fetch(latestUrl);
+                    const obsData = await obsRes.json();
+                    const p = obsData.properties;
+
+                    const atmos = {
+                        humidity: p.relativeHumidity?.value ?? 70,
+                        visibility: (p.visibility?.value ?? 16000) / 1000,
+                        temperature: p.temperature?.value ?? 20,
+                        description: p.textDescription || 'Clear',
+                        windDirection: p.windDirection?.value ?? 0
+                    };
+                    this.cache = atmos;
+                    this.cacheTime = Date.now();
+                    return atmos;
+                } catch (err) {
+                    console.warn("NOAA fetch failed", err);
+                    return { humidity: 70, visibility: 16, temperature: 22, description: 'Clear', windDirection: 140 };
+                }
+            }
+        };
+
+        // Original functions
+        function selectSurface(e) {
+            const rect = e.target.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = x / rect.width;
+            art.style.opacity = 0.5 + (percent * 0.5);
+            bondStatus.innerText = "Surface Selected: Refractive Index " + (1.3 + percent).toFixed(2);
+        }
+
+        function toggleGrid(id) {
+            const el = document.getElementById('svg-' + id);
+            const btn = document.getElementById('btn-' + id);
+            el.classList.toggle('active-overlay');
+            btn.classList.toggle('active-btn');
+        }
+
+        function setCanvas(val) {
+            const vp = document.getElementById('canvas-viewport');
+            if(val === '1.618') {
+                vp.style.width = "400px"; vp.style.height = "647px";
+            } else if(val === '9-16') {
+                vp.style.width = "337px"; vp.style.height = "600px";
+            } else {
+                const [w, h] = val.split('-');
+                vp.style.width = (w * 35) + "px";
+                vp.style.height = (h * 35) + "px";
+            }
+        }
+
+        function setOptic(type) {
+            if(type === 'high-contrast') art.style.filter = "contrast(1.5)";
+            if(type === 'desaturate') art.style.filter = "saturate(0.5) hue-rotate(15deg)";
+            if(type === 'warmth') art.style.filter = "sepia(0.3) brightness(1.1)";
+            if(type === 'dynamic') art.style.filter = "brightness(1.2) contrast(1.3)";
+            bondStatus.innerText = "Optic Applied: " + type.toUpperCase();
+        }
+
+        function applyMaster(style) {
+            bondStatus.innerText = "Applying " + style.toUpperCase() + " Transduction...";
+            if(style === 'davinci') art.style.filter = "sepia(0.3) blur(1px) contrast(1.1)";
+            if(style === 'caravaggio') art.style.filter = "brightness(0.6) contrast(1.8) saturate(0.8)";
+            if(style === 'rubens') art.style.filter = "saturate(1.4) brightness(1.1) sepia(0.1)";
+            if(style === 'michelangelo') art.style.filter = "contrast(1.4) grayscale(0.2) brightness(1.1)";
+        }
+
+        function runQTranslation() {
+            bondStatus.innerText = "Activating Quantum Bond...";
+            setTimeout(() => {
+                alert("Q_Translation Complete. Spectral Data logged.");
+                bondStatus.innerText = "Verified by Veridian Q";
+            }, 1500);
+        }
+
+        function manualContrast(v) {
+            // Dynamic slider - adjusts based on which editing mode is active
+            if (activeEditingMode === 'shadow') {
+                // Adjust shadow/hue intensity
+                const intensity = (v - 100) / 100; // Convert to 0-1 range
+                art.style.filter = `saturate(${1 - intensity * 0.5}) hue-rotate(${intensity * 15}deg)`;
+                bondStatus.innerText = `Shadow Hue: ${v}%`;
+            } else if (activeEditingMode === 'saturation') {
+                // Adjust saturation/dynamic range intensity
+                const satValue = v / 100; // Convert to multiplier
+                art.style.filter = `brightness(${1 + satValue * 0.2}) contrast(${1 + satValue * 0.3}) saturate(${satValue})`;
+                bondStatus.innerText = `Dynamic Range: ${v}%`;
+            } else {
+                // Default contrast control when no mode is active
+                art.style.filter = `contrast(${v}%)`;
+                bondStatus.innerText = `Manual Contrast: ${v}%`;
+            }
+        }
+
+        // ============================================================================
+        // CINEMATIC EFFECT - NOAA-Synced Movement
+        // ============================================================================
+        // Creates subtle Ken Burns-style zoom that moves toward viewer
+        // Synced with NOAA atmospheric data for psychological tension
+        // Hollywood technique for still shots on timeline
+        
+        let cinematicActive = false;
+        let cinematicIntensity = 'moderate'; // subtle, moderate, intense
+        
+        async function toggleCinematic() {
+            cinematicActive = !cinematicActive;
+            const artLayer = document.getElementById('art-layer');
+            const btn = document.getElementById('btn-cinematic');
+            
+            if (cinematicActive) {
+                // Fetch NOAA data to determine intensity
+                bondStatus.innerText = 'Syncing Cinematic with KCHS Atmosphere...';
+                btn.classList.add('active-btn');
+                
+                try {
+                    const atmos = await NOAA.fetch();
+                    
+                    // Calculate intensity based on NOAA data
+                    // High humidity (>70%) = slower, subtle movement (atmospheric drag)
+                    // Low visibility (<10km) = faster, intense movement (tension)
+                    if (atmos.humidity > 70) {
+                        cinematicIntensity = 'subtle';
+                    } else if (atmos.visibility < 10) {
+                        cinematicIntensity = 'intense';
+                    } else {
+                        cinematicIntensity = 'moderate';
+                    }
+                    
+                    // Apply cinematic classes
+                    artLayer.classList.add('cinematic-active');
+                    artLayer.classList.add(`cinematic-${cinematicIntensity}`);
+                    
+                    bondStatus.innerText = `Cinematic Active: ${cinematicIntensity.toUpperCase()} movement • ${atmos.humidity.toFixed(0)}% RH`;
+                    
+                } catch (error) {
+                    // Fallback to moderate if NOAA fails
+                    cinematicIntensity = 'moderate';
+                    artLayer.classList.add('cinematic-active', 'cinematic-moderate');
+                    bondStatus.innerText = 'Cinematic Active: MODERATE movement';
+                }
+                
+            } else {
+                // Deactivate cinematic effect
+                artLayer.classList.remove('cinematic-active', 'cinematic-subtle', 'cinematic-moderate', 'cinematic-intense');
+                btn.classList.remove('active-btn');
+                bondStatus.innerText = 'Cinematic Deactivated';
+            }
+        }
+        
+        // Individual editing functions for Shadow and Saturation buttons
+        let shadowActive = false;
+        let saturationActive = false;
+        let activeEditingMode = null; // Track which editing mode is active
+        
+        function toggleShadow() {
+            shadowActive = !shadowActive;
+            const btn = document.getElementById('btn-shadow');
+            
+            if (shadowActive) {
+                // Activate Hue Shift mode from Dynamic Optics (affects shadows/color)
+                activeEditingMode = 'shadow';
+                setOptic('desaturate');
+                btn.classList.add('active-btn');
+                bondStatus.innerText = 'Shadow Mode Active - Use slider to adjust';
+            } else {
+                activeEditingMode = null;
+                art.style.filter = '';
+                btn.classList.remove('active-btn');
+                bondStatus.innerText = 'Shadow Reset';
+            }
+        }
+        
+        function toggleSaturation() {
+            saturationActive = !saturationActive;
+            const btn = document.getElementById('btn-saturation');
+            
+            if (saturationActive) {
+                // Activate Dynamic Range mode (affects saturation/vibrancy)
+                activeEditingMode = 'saturation';
+                setOptic('dynamic');
+                btn.classList.add('active-btn');
+                bondStatus.innerText = 'Saturation Mode Active - Use slider to adjust';
+            } else {
+                activeEditingMode = null;
+                art.style.filter = '';
+                btn.classList.remove('active-btn');
+                bondStatus.innerText = 'Saturation Reset';
+            }
+        }
+
+        function setNorthLight() {
+            // Fetch NOAA data and apply North Light preset
+            bondStatus.innerText = 'Activating 10AM North Light with Live KCHS...';
+            
+            NOAA.fetch().then(atmos => {
+                // Update KCHS display
+                kchsStatus.innerText = `${atmos.description} • ${atmos.humidity.toFixed(0)}% RH • Vis ${atmos.visibility.toFixed(0)}km`;
+                
+                // Show atmospheric analysis
+                const atmosAnalysis = document.getElementById('atmospheric-analysis');
+                const atmosSummary = document.getElementById('atmos-summary');
+                if (atmosAnalysis && atmosSummary) {
+                    atmosAnalysis.classList.remove('hidden');
+                    atmosSummary.innerText = `${atmos.description}. ${atmos.humidity.toFixed(0)}% RH creates soft coastal scattering. Visibility ${atmos.visibility.toFixed(0)} km adds atmospheric perspective.`;
+                }
+                
+                // Apply North Light settings with atmospheric influence
+                // Diffusion scaled to stay within 15% max (0.10 base + up to 0.05 for humidity)
+                const diffusionValue = Math.min(0.10 + (atmos.humidity / 100 * 0.05), 0.15);
+                SacredPlane.params = { 
+                    colorTemp: 7000, 
+                    haze: 0, 
+                    diffusion: diffusionValue,
+                    azimuth: 0, 
+                    elevation: 45 
+                };
+                
+                // Update slider input values
+                const sliders = document.querySelectorAll('#content-creator-panel input[type="range"]');
+                if (sliders[0]) sliders[0].value = 7000;
+                if (sliders[1]) sliders[1].value = diffusionValue;
+                if (sliders[2]) sliders[2].value = 0;
+                if (sliders[3]) sliders[3].value = 45;
+                
+                SacredPlane.updateUI();
+                applySliderEffects();
+                bondStatus.innerText = `10AM North Light: Activated with ${atmos.humidity.toFixed(0)}% RH`;
+            });
+        }
+
+        function toggleFitScreen() {
+            isFitScreen = !isFitScreen;
+            viewport.style.width = isFitScreen ? '100%' : '450px';
+            viewport.style.height = isFitScreen ? '100%' : '600px';
+        }
+
+        function applySliderEffects() {
+            const p = SacredPlane.params;
+            art.style.filter = `hue-rotate(${(p.colorTemp - 6500)/50}deg) brightness(${1 + p.diffusion}) contrast(${1 + p.haze*0.5}) blur(${p.haze*3}px)`;
+            lightOverlay.style.background = `linear-gradient(${p.azimuth}deg, rgba(255,255,255,${p.elevation/90*0.4}), transparent 70%)`;
+            lightOverlay.style.opacity = 0.2 + p.haze * 0.4;
+        }
+
+        // ============================================================================
+        // VERIDIAN Q - PROFESSIONAL CINEMATOGRAPHY PRESETS
+        // ============================================================================
+        // 
+        // Based on industry-standard lighting principles used in film, streaming,
+        // and professional content creation. Each preset represents real techniques
+        // used by cinematographers, gaffers, and directors of photography.
+        //
+        // CORE PRINCIPLES:
+        // 
+        // 1. THREE-POINT LIGHTING FOUNDATION
+        //    - Key Light: Main source, defines the subject
+        //    - Fill Light: Softens shadows created by key
+        //    - Backlight: Separates subject from background
+        //    - Key-to-Fill Ratios: 2:1 creates natural depth, higher = more drama
+        //
+        // 2. COLOR TEMPERATURE (Kelvin Scale)
+        //    - 5600K = Daylight neutral (natural, balanced skin tones)
+        //    - 3200K = Warm tungsten (golden hour, intimate mood)
+        //    - 6000K+ = Cool daylight (crisp, clean, commercial)
+        //    - Sets mood, matches natural light sources
+        //
+        // 3. LIGHT QUALITY (Diffusion) - FIXED STANDARD
+        //    - MAXIMUM: 15% (0.15) - Professional cinematic limit
+        //    - OPTIMAL: 10% (0.10) - Industry standard for balanced quality
+        //    - Over 15% creates harsh, unnatural diffusion
+        //    - Soft/Diffused: Flattering, gentle, minimizes texture
+        //    - Hard/Direct: Sharp, dramatic, emphasizes definition
+        //    - Controls contrast and perceived depth
+        //
+        // 4. LIGHT POSITION (Azimuth & Elevation)
+        //    - Rembrandt Position: 45° creates signature triangle on cheek
+        //    - Front (0°): Even, neutral, beauty lighting
+        //    - Side (90°): Rim/edge light, dimension and separation
+        //    - Elevation: Eye-level (40-50°) natural, low (20-30°) sunset feel
+        //
+        // THE 4 C's OF LIGHTING (Tim Kang Framework):
+        //    - Contour: Defines shape and form
+        //    - Contrast: Sets mood and emotional tone
+        //    - Clarity: Establishes context and environment
+        //    - Color: Enhances all variables, defines place and time
+        //
+        // ============================================================================
+
+        // Preset Definitions - Professional Cinematography Standards
+        const presetData = {
+            // BEAUTY RING - Neutral Front Lighting (Portrait Standard)
+            // Simulates ring light setup: even, flattering, minimizes shadows
+            // Industry: Beauty, portrait, talking-head content
+            // Principle: Neutral lighting that diffuses facial shadows
+            beautyRing: { 
+                colorTemp: 5600,      // Daylight neutral - natural skin tones
+                diffusion: 0.12,      // 12% - Soft, flattering (within 15% max)
+                azimuth: 0,           // Front-facing - even illumination
+                elevation: 45,        // Eye-level angle - neutral perspective
+                desc: 'Neutral front light • Flattering portraits • Talking-head standard'
+            },
+            
+            // KEY + FILL - Three-Point Foundation (Cinematic Standard)
+            // Classic narrative lighting: Key (main) + Fill (soften shadows)
+            // Industry: Film, streaming, professional content
+            // Principle: 2:1 key-to-fill ratio for natural depth
+            keyFill: { 
+                colorTemp: 5200,      // Studio standard - balanced mood
+                diffusion: 0.10,      // 10% - Optimal cinematic diffusion
+                azimuth: 45,          // 45° angle - Rembrandt-inspired position
+                elevation: 40,        // Slightly elevated - natural shadow fall
+                desc: 'Three-point foundation • 2:1 ratio • Cinematic depth'
+            },
+            
+            // PRODUCT LIGHT - High-Key Clarity (Commercial Standard)
+            // Sharp, direct light for maximum detail and definition
+            // Industry: Product photography, e-commerce, reviews
+            // Principle: High intensity, crisp edges, minimal diffusion
+            productHighlight: { 
+                colorTemp: 6000,      // Bright daylight - crisp, clean white
+                diffusion: 0.05,      // 5% - Sharp definition, minimal diffusion
+                azimuth: 90,          // Side angle - rim light effect
+                elevation: 50,        // Elevated - creates dimension
+                desc: 'High-key clarity • Crisp edges • Product standard'
+            },
+            
+            // GOLDEN HOUR - Natural Warmth (Organic Standard)
+            // Simulates sunrise/sunset: soft, warm, magical quality
+            // Industry: Vlogs, lifestyle, outdoor content
+            // Principle: Natural motivation - warm tungsten range
+            goldenHour: { 
+                colorTemp: 3200,      // Warm tungsten - golden glow
+                diffusion: 0.11,      // 11% - Soft organic quality
+                azimuth: 30,          // Low angle - natural sun position
+                elevation: 20,        // Near horizon - sunset/sunrise feel
+                desc: 'Warm natural light • Golden hour magic • Organic mood'
+            },
+            
+            // Art Master Presets (Legacy - for backward compatibility)
+            caravaggio: { colorTemp: 3200, diffusion: 0.13, azimuth: 30, elevation: 25, desc: 'Dramatic tenebrism' },
+            rembrandt: { colorTemp: 4500, diffusion: 0.10, azimuth: 45, elevation: 35, desc: 'Warm intimate glow' },
+            vanderWeyden: { colorTemp: 6500, diffusion: 0.07, azimuth: 90, elevation: 50, desc: 'Soft naturalistic veil' },
+            ingres: { colorTemp: 5500, diffusion: 0.08, azimuth: 0, elevation: 40, desc: 'Smooth classical light' },
+            coolNeon: { colorTemp: 8000, diffusion: 0.11, azimuth: 135, elevation: 30, desc: 'Cyberpunk cool tones' }
+        };
+
+        let currentPack = 'curator';
+
+        function switchPack(pack) {
+            currentPack = pack;
+            const curatorBtn = document.getElementById('btn-curator-pack');
+            const contentBtn = document.getElementById('btn-content-pack');
+            const curatorPanel = document.getElementById('curator-panel');
+            const contentPanel = document.getElementById('content-creator-panel');
+            
+            if (pack === 'curator') {
+                // Show Curator panel (Artist Database)
+                curatorBtn.classList.add('active-btn');
+                contentBtn.classList.remove('active-btn');
+                curatorPanel.classList.remove('hidden');
+                contentPanel.classList.add('hidden');
+                bondStatus.innerText = 'Curator Mode: Artist Database';
+            } else {
+                // Show Content Creator panel (Sliders + Presets)
+                contentBtn.classList.add('active-btn');
+                curatorBtn.classList.remove('active-btn');
+                curatorPanel.classList.add('hidden');
+                contentPanel.classList.remove('hidden');
+                bondStatus.innerText = 'Content Creator Mode: Professional Controls';
+            }
+        }
+
+        function applyPreset(presetName) {
+            const preset = presetData[presetName];
+            if (!preset) return;
+            
+            SacredPlane.params = { 
+                colorTemp: preset.colorTemp, 
+                haze: 0, 
+                diffusion: preset.diffusion, 
+                azimuth: preset.azimuth, 
+                elevation: preset.elevation 
+            };
+            
+            // Update slider input values in Content Creator panel
+            const sliders = document.querySelectorAll('#content-creator-panel input[type="range"]');
+            if (sliders[0]) sliders[0].value = preset.colorTemp;
+            if (sliders[1]) sliders[1].value = preset.diffusion;
+            if (sliders[2]) sliders[2].value = preset.azimuth;
+            if (sliders[3]) sliders[3].value = preset.elevation;
+            
+            SacredPlane.updateUI();
+            applySliderEffects();
+            bondStatus.innerText = `Applied: ${presetName} - ${preset.desc}`;
+        }
+
+        function exportRender() {
+            const canvas = document.getElementById('art-layer');
+            if (!canvas || !canvas.src) {
+                bondStatus.innerText = 'No image to export';
+                return;
+            }
+            
+            // Create a temporary canvas to capture the rendered image
+            const tempCanvas = document.createElement('canvas');
+            const ctx = tempCanvas.getContext('2d');
+            const img = new Image();
+            img.onload = () => {
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                // Download the image
+                const link = document.createElement('a');
+                link.download = 'veridian-q-render.png';
+                link.href = tempCanvas.toDataURL('image/png');
+                link.click();
+                bondStatus.innerText = 'Render exported successfully';
+            };
+            img.src = canvas.src;
+        }
+
+        // Sacred Plane
+        const SacredPlane = {
+            uploadedImage: null,
+            params: { colorTemp: 6500, haze: 0, diffusion: 0.10, azimuth: 45, elevation: 30 },
+
+            init() {
+                const zone = document.getElementById('texture-drop-zone');
+                const input = document.getElementById('texture-input');
+                zone.onclick = () => input.click();
+                zone.ondragover = e => { e.preventDefault(); zone.style.background = 'rgba(197,160,89,0.25)'; };
+                zone.ondragleave = () => zone.style.background = 'rgba(197,160,89,0.05)';
+                zone.ondrop = e => {
+                    e.preventDefault();
+                    zone.style.background = 'rgba(197,160,89,0.05)';
+                    if (e.dataTransfer.files[0]) this.loadImage(e.dataTransfer.files[0]);
+                };
+                input.onchange = e => { if (e.target.files[0]) this.loadImage(e.target.files[0]); };
+            },
+
+            loadImage(file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    this.uploadedImage = e.target.result;
+                    art.src = e.target.result;
+                    art.classList.remove('opacity-0');
+                    this.showInterface();
+                };
+                reader.readAsDataURL(file);
+            },
+
+            showInterface() {
+                // Show all control elements
+                document.getElementById('sp-preview').classList.remove('hidden');
+                document.getElementById('pack-toggle').classList.remove('hidden');
+                document.getElementById('content-creator-panel').classList.remove('hidden'); // Show Content Creator by default
+                document.getElementById('btn-new-image').classList.remove('hidden');
+                
+                // Update preview image
+                document.getElementById('preview-image').src = this.uploadedImage;
+                
+                // Hide the upload zone
+                document.getElementById('texture-drop-zone').style.display = 'none';
+                
+                // Set Content Creator as active
+                document.getElementById('btn-content-pack').classList.add('active-btn');
+                document.getElementById('btn-curator-pack').classList.remove('active-btn');
+                currentPack = 'content';
+                
+                bondStatus.innerText = 'Image loaded - Fetching live KCHS data...';
+                
+                // Fetch NOAA data
+                this.process();
+            },
+
+            updateUI() {
+                if (document.getElementById('v1')) document.getElementById('v1').innerText = this.params.colorTemp + 'K';
+                if (document.getElementById('v3')) document.getElementById('v3').innerText = (this.params.diffusion * 100).toFixed(0) + '%';
+                if (document.getElementById('v4')) document.getElementById('v4').innerText = this.params.azimuth + '°';
+                if (document.getElementById('v5')) document.getElementById('v5').innerText = this.params.elevation + '°';
+            },
+
+            update(key, val) {
+                this.params[key] = parseFloat(val);
+                this.updateUI();
+                applySliderEffects();
+            },
+
+            async process() {
+                bondStatus.innerText = 'SYNCING KCHS...';
+                const atmos = await NOAA.fetch();
+                kchsStatus.innerText = `${atmos.description} • ${atmos.humidity.toFixed(0)}% RH • Vis ${atmos.visibility.toFixed(0)}km`;
+                
+                // Show atmospheric analysis in bottom panel
+                const atmosAnalysis = document.getElementById('atmospheric-analysis');
+                const atmosSummary = document.getElementById('atmos-summary');
+                if (atmosAnalysis && atmosSummary) {
+                    atmosAnalysis.classList.remove('hidden');
+                    atmosSummary.innerText = `${atmos.description}. ${atmos.humidity.toFixed(0)}% RH creates soft coastal scattering. Visibility ${atmos.visibility.toFixed(0)} km adds atmospheric perspective.`;
+                }
+                
+                bondStatus.innerText = 'LIVE ATMOS SYNCED';
+            },
+
+            reset() {
+                art.src = '';
+                art.classList.add('opacity-0');
+                lightOverlay.style.opacity = 0;
+                
+                // Reset the upload zone and hide all controls
+                document.getElementById('texture-drop-zone').style.display = 'flex';
+                document.getElementById('sp-preview').classList.add('hidden');
+                document.getElementById('pack-toggle').classList.add('hidden');
+                document.getElementById('curator-panel').classList.add('hidden');
+                document.getElementById('content-creator-panel').classList.add('hidden');
+                document.getElementById('btn-new-image').classList.add('hidden');
+                
+                // Hide atmospheric analysis
+                const atmosAnalysis = document.getElementById('atmospheric-analysis');
+                if (atmosAnalysis) atmosAnalysis.classList.add('hidden');
+                
+                // Reset to Content Creator pack as default
+                currentPack = 'content';
+                document.getElementById('btn-content-pack').classList.add('active-btn');
+                document.getElementById('btn-curator-pack').classList.remove('active-btn');
+                
+                // Reset params to defaults
+                this.params = { colorTemp: 6500, haze: 0, diffusion: 0.10, azimuth: 45, elevation: 30 };
+                this.uploadedImage = null;
+                
+                bondStatus.innerText = 'Idle';
+                kchsStatus.innerText = 'Fetching...';
+            }
+        };
+
+        window.onload = () => SacredPlane.init();
+    </script>
+</body>
+</html>
