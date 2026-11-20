@@ -37,11 +37,16 @@ export async function POST(req: Request) {
   const imageUrl = body.imageUrl?.trim();
   // 0.75 was close to a full re-roll -- the model barely looked at the photo
   // and mostly invented a new image from the text prompt. 0.35 fixed the
-  // subject/composition drift, but still smoothed away fine detail (fur,
-  // texture, hard edges) toward a generic glossy look. 0.22 stays even
-  // closer to the source pixels so that kind of detail survives, while the
-  // chosen medium still visibly changes how it's rendered.
-  const strength = typeof body.strength === 'number' ? body.strength : 0.22;
+  // subject/composition drift but still smoothed detail into a generic
+  // glossy look. 0.22 kept the source pixels almost untouched -- which
+  // fixed the smoothing, but then the chosen medium (impasto, monochromatic,
+  // etc.) barely showed up: it looked too close to the original photo to
+  // read as a *painting preview*. The point of Auto Paint is a preview of
+  // how the medium would look, not a pixel-for-pixel match -- so this needs
+  // enough departure that the medium is unmistakable. 0.45 is the new
+  // middle ground: subject/composition still held in place by the prompt
+  // below, but real room for paint texture, body and value shifts to show.
+  const strength = typeof body.strength === 'number' ? body.strength : 0.45;
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -56,11 +61,12 @@ export async function POST(req: Request) {
   // the scene, not just reinterpret its rendering.
   const finalPrompt = imageUrl
     ? [
-        'Repaint this exact photo',
+        'Paint this subject in a real physical medium, as a genuine painting, not a filtered photo',
         styleModifier,
         userPrompt,
-        'keep the same subject, pose, framing and composition as the reference photo -- only the medium and rendering style change, nothing depicted should change',
-        'preserve every fine detail exactly as in the reference -- rough, scraggly, textured fur and hair, hard sharp edges, visible individual strands -- do not smooth, soften, blur, or simplify any edge or texture, do not make it glossy or airbrushed',
+        'keep the same subject, pose, framing and composition as the reference photo',
+        'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
+        'rough, scraggly, hand-made edges and texture, not photographic or airbrushed -- this should look and feel like paint, pastel, or charcoal on a surface, not a digital filter over a photo',
       ].filter(Boolean).join(', ')
     : [styleModifier, userPrompt].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
