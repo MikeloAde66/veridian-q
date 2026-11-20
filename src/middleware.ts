@@ -1,18 +1,18 @@
-// Gates the whole app behind login. Anything other than /login, the magic
-// link callback/confirm, and Next's own internals/assets redirects to /login
-// when there's no signed-in Supabase session; signed-in visitors to /login
-// get bounced straight into the app. The gate only applies in production —
-// local dev (npm run dev) always goes straight to the canvas, since the
-// point of the gate is to lock the public deployment, not your own machine.
+// Gates the app behind login. "/" is the public landing page (with the
+// temporary Enter button); everything else redirects there when there's no
+// signed-in Supabase session. A signed-in visitor hitting "/" gets bounced
+// straight into "/canvas". The gate only applies in production — local dev
+// (npm run dev) always goes straight through, since the point of the gate
+// is to lock the public deployment, not your own machine.
 //
 // TEMP BYPASS: set DISABLE_AUTH_GATE=true in Vercel's env vars to skip the
-// gate in production too, while the OTP sign-in flow is still being sorted
+// gate in production too, while the real sign-in flow is still being sorted
 // out. Flip that var off (or delete it) to turn the gate back on — no code
 // change needed.
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/confirm', '/api/covers'];
+const PUBLIC_PATHS = ['/', '/auth/callback', '/auth/confirm', '/api/covers'];
 
 export async function middleware(request: NextRequest) {
   if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_AUTH_GATE === 'true') {
@@ -44,12 +44,12 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
-  if (user && path === '/login') {
+  if (user && path === '/') {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/canvas';
     return NextResponse.redirect(url);
   }
 
