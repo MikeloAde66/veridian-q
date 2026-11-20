@@ -4,13 +4,18 @@
 // get bounced straight into the app. The gate only applies in production —
 // local dev (npm run dev) always goes straight to the canvas, since the
 // point of the gate is to lock the public deployment, not your own machine.
+//
+// TEMP BYPASS: set DISABLE_AUTH_GATE=true in Vercel's env vars to skip the
+// gate in production too, while the OTP sign-in flow is still being sorted
+// out. Flip that var off (or delete it) to turn the gate back on — no code
+// change needed.
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/confirm', '/api/covers'];
 
 export async function middleware(request: NextRequest) {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' || process.env.DISABLE_AUTH_GATE === 'true') {
     return NextResponse.next();
   }
 
