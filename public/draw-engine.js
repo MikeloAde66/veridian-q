@@ -18,6 +18,19 @@ let medium = 'graphite', variant='hb';
 let color = '#1a1a1a';
 let brushSize = 14;
 let paperType = 'bristol'; // which of the 6 SURFACES is active -- see SURFACES below
+
+// Auto Paint draws its generated image straight onto the paper canvas's own
+// pixels (pctx.drawImage below) so it sits under the brush strokes exactly
+// like a real underpainting -- but that means it's not represented anywhere
+// as data, only as pixels already drawn. fullRedraw() used to just call
+// drawPaper() fresh, which regenerates the surface texture from scratch and
+// has no idea an Auto Paint image was ever drawn on top of it -- so every
+// export silently dropped the Auto Paint result and shipped a blank surface.
+// Keeping the image + its placement here lets fullRedraw() replay it.
+let autoPaintImg = null; // {img, dx, dy, dw, dh} in base (1000x1300) coordinates, or null
+function drawAutoPaintImg(ctx){
+  if (autoPaintImg) ctx.drawImage(autoPaintImg.img, autoPaintImg.dx, autoPaintImg.dy, autoPaintImg.dw, autoPaintImg.dh);
+}
 let pressureMode = 'auto';
 let lastPt = null, lastTime = 0;
 
@@ -316,6 +329,7 @@ function drawLayeredStrokes(ctx){
 }
 function fullRedraw(ctx){
   drawPaper(ctx);
+  drawAutoPaintImg(ctx);
   drawLayeredStrokes(ctx);
 }
 function redrawLiveStrokes(){
@@ -471,7 +485,7 @@ SURFACES.forEach(t=>{
   b.title = t.label;
   b.style.background = paperBase(t.type);
   b.addEventListener('click', ()=>{
-    paperType = t.type; drawPaper(pctx);
+    paperType = t.type; drawPaper(pctx); drawAutoPaintImg(pctx);
     document.querySelectorAll('.tex-swatch').forEach(s=>s.classList.remove('active'));
     b.classList.add('active');
   });
@@ -846,8 +860,9 @@ autoPaintBtn.addEventListener('click', async ()=>{
       const scale = Math.max(cw/img.width, ch/img.height);
       const dw = img.width*scale, dh = img.height*scale;
       const dx = (cw-dw)/2, dy = (ch-dh)/2;
+      autoPaintImg = {img, dx, dy, dw, dh}; // keep it so exports (fullRedraw) can replay it
       drawPaper(pctx);
-      pctx.drawImage(img, dx, dy, dw, dh);
+      drawAutoPaintImg(pctx);
       autoPaintHint.textContent = DEFAULT_AUTOPAINT_HINT;
       autoPaintBtn.disabled = false;
       autoPaintBtn.textContent = 'Auto Paint';

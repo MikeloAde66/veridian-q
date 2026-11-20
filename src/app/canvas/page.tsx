@@ -471,7 +471,7 @@ export default function DrawPage() {
     </div>
   </div>
 </div>` }} />
-      <Script src="/draw-engine.js?v=4" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=5" strategy="afterInteractive" />
     </>
   );
 }
