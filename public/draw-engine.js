@@ -591,12 +591,15 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
       octx.beginPath(); octx.moveTo(x,y); octx.lineTo(x,y+dy*len); octx.stroke();
     });
   }
-  const dataUrl = off.toDataURL('image/png');
+  const format = document.getElementById('formatSel').value; // 'png' | 'jpeg'
+  const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const dataUrl = off.toDataURL(mime, 0.92);
   document.getElementById('exportImg').src = dataUrl;
   document.getElementById('exportMeta').textContent =
-    `${pxW}×${pxH}px · ${dpi} DPI · ${Number(wIn.value)}×${Number(hIn.value)}in` + (bleed>0?' (+0.125" bleed, crop marks)':'');
+    `${pxW}×${pxH}px · ${dpi} DPI · ${Number(wIn.value)}×${Number(hIn.value)}in · ${format.toUpperCase()}` + (bleed>0?' (+0.125" bleed, crop marks)':'');
   document.getElementById('exportOverlay').style.display='flex';
   window._lastExportCanvas = off;
+  window._lastExportFormat = format;
 });
 document.getElementById('closeExportBtn').addEventListener('click', ()=>{
   document.getElementById('exportOverlay').style.display='none';
@@ -604,11 +607,14 @@ document.getElementById('closeExportBtn').addEventListener('click', ()=>{
 document.getElementById('downloadImgBtn').addEventListener('click', ()=>{
   const off = window._lastExportCanvas;
   if(!off) return;
+  const format = window._lastExportFormat || 'png';
+  const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
   off.toBlob(blob=>{
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `veridianq-${Date.now()}.png`;
+    a.download = `veridianq-${Date.now()}.${ext}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -618,11 +624,13 @@ document.getElementById('downloadImgBtn').addEventListener('click', ()=>{
 document.getElementById('copyImgBtn').addEventListener('click', async ()=>{
   try{
     const off = window._lastExportCanvas;
+    // Clipboard images must be PNG regardless of the chosen download format --
+    // browsers refuse ClipboardItem writes of type image/jpeg.
     off.toBlob(async blob=>{
       try{
         await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
       }catch(err){ /* clipboard write may be refused in this sandbox; image stays visible for manual save */ }
-    });
+    }, 'image/png');
   }catch(e){}
 });
 

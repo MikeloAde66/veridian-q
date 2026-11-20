@@ -35,7 +35,12 @@ export async function POST(req: Request) {
   const userPrompt = (body.prompt ?? '').trim();
   const styleModifier = (body.styleModifier ?? '').trim();
   const imageUrl = body.imageUrl?.trim();
-  const strength = typeof body.strength === 'number' ? body.strength : 0.75;
+  // 0.75 was close to a full re-roll -- the model barely looked at the photo
+  // and mostly invented a new image from the text prompt, which is why a
+  // loaded reference photo came back as a different person entirely. 0.35
+  // keeps the source photo's subject, pose and composition intact while
+  // still letting the chosen medium (charcoal, oil, etc.) visibly repaint it.
+  const strength = typeof body.strength === 'number' ? body.strength : 0.35;
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -44,17 +49,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const finalPrompt = [styleModifier, userPrompt].filter(Boolean).join(', ') || styleModifier || 'a painting';
+  // When repainting a real photo, say explicitly that the subject must stay
+  // the same -- only the medium changes. Without this the model treats the
+  // style words ("rendered as a charcoal sketch...") as license to redesign
+  // the scene, not just reinterpret its rendering.
+  const finalPrompt = imageUrl
+    ? [
+        'Repaint this exact photo',
+        styleModifier,
+        userPrompt,
+        'keep the same subject, pose, framing and composition as the reference photo -- only the medium and rendering style change, nothing depicted should change',
+      ].filter(Boolean).join(', ')
+    : [styleModifier, userPrompt].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
   const model = imageUrl ? MODELS.imageToImage : MODELS.textToImage;
   const input: Record<string, unknown> = {
     prompt: finalPrompt,
     num_images: 1,
-    image_size: 'square_hd',
   };
   if (imageUrl) {
+    // No image_size here: forcing 'square_hd' was stretching/cropping every
+    // non-square reference photo into a square before the model even started,
+    // which on its own would make the result look like a different photo.
+    // Leaving it unset lets the model match the input photo's own dimensions.
     input.image_url = imageUrl;
     input.strength = strength;
+  } else {
+    input.image_size = 'square_hd';
   }
 
   try {

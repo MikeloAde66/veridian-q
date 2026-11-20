@@ -243,7 +243,7 @@ export default function DrawPage() {
           <summary>Layers</summary>
           <div id="layersList"></div>
           <button class="btn" id="addLayerBtn" style="margin-top:6px;">+ Add Layer</button>
-          <div class="hint" style="padding:6px 2px 2px;">Everything you paint goes on the active (highlighted) layer. Render Print File / Download always flattens every visible layer into one ordinary image file.</div>
+          <div class="hint" style="padding:6px 2px 2px;">Everything you paint goes on the active (highlighted) layer. Export always flattens every visible layer into one ordinary image file.</div>
         </details>
 
         <details class="menu-cat">
@@ -384,16 +384,20 @@ export default function DrawPage() {
       <button class="btn primary" id="autoPaintBtn" style="margin-top:8px;">Auto Paint</button>
       <div class="hint" id="autoPaintHint"></div>
 
-      <select id="presetSel" title="Substrate Preset" style="margin-top:14px;"></select>
+      <select id="presetSel" title="Export Size" style="margin-top:14px;"></select>
       <div class="row" style="margin-top:8px;">
         <div><input type="number" id="wIn" value="8" step="0.5" title="Width (in)"></div>
         <div><input type="number" id="hIn" value="10" step="0.5" title="Height (in)"></div>
       </div>
       <input type="number" id="dpiIn" value="150" step="25" title="Output DPI" style="margin-top:8px;">
+      <select id="formatSel" style="margin-top:8px;" title="File Format">
+        <option value="png">PNG</option>
+        <option value="jpeg">JPEG</option>
+      </select>
       <label style="display:flex;align-items:center;gap:6px;margin-top:10px;" title="Add 0.125&quot; Bleed + Crop Marks">
         <input type="checkbox" id="bleedChk" style="width:auto;"> <span class="small">Bleed</span>
       </label>
-      <button class="btn primary" id="exportBtn" style="margin-top:10px;">Render Print File</button>
+      <button class="btn primary" id="exportBtn" style="margin-top:10px;">Export</button>
       <div class="mini-monitor" id="miniMonitor" title="Live preview">
         <div class="mini-monitor-screen"><canvas id="miniMonitorCv" width="240" height="180"></canvas></div>
       </div>
@@ -413,7 +417,7 @@ export default function DrawPage() {
     </div>
   </div>
 </div>` }} />
-      <Script src="/draw-engine.js?v=2" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=3" strategy="afterInteractive" />
     </>
   );
 }
