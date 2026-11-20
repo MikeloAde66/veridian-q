@@ -551,12 +551,16 @@ zoomSlider.addEventListener('input', applyZoom);
 window.addEventListener('resize', applyZoom);
 
 // ---------- export presets ----------
+// Sizes kept to what a browser tab can safely render -- the old industrial
+// sign/banner/mural presets (up to 48x96in @300dpi) built canvases of 100M+
+// pixels, which was enough on its own to push some machines into system-wide
+// out-of-memory territory. Max preset here (2400x3000px) stays well under
+// that, while still being plenty sharp for normal printing.
 const PRESETS = [
-  {name:'Indoor Sign Panel — 24×36in @150dpi', w:24,h:36,dpi:150},
-  {name:'Outdoor Banner — 36×48in @100dpi', w:36,h:48,dpi:100},
-  {name:'Large Format Banner — 48×96in @100dpi', w:48,h:96,dpi:100},
-  {name:'Interior Mural Proof — 24×36in @300dpi', w:24,h:36,dpi:300},
-  {name:'Fine Art / Giclée — 16×20in @300dpi', w:16,h:20,dpi:300},
+  {name:'Web / Screen — 10×13in @100dpi', w:10,h:13,dpi:100},
+  {name:'Standard Print — 8×10in @150dpi', w:8,h:10,dpi:150},
+  {name:'Large Print — 11×14in @150dpi', w:11,h:14,dpi:150},
+  {name:'Poster — 16×20in @150dpi', w:16,h:20,dpi:150},
   {name:'Custom', w:null,h:null,dpi:null}
 ];
 const presetSel = document.getElementById('presetSel');

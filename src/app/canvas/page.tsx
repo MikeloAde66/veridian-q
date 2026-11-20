@@ -386,8 +386,8 @@ export default function DrawPage() {
 
       <select id="presetSel" title="Substrate Preset" style="margin-top:14px;"></select>
       <div class="row" style="margin-top:8px;">
-        <div><input type="number" id="wIn" value="24" step="0.5" title="Width (in)"></div>
-        <div><input type="number" id="hIn" value="36" step="0.5" title="Height (in)"></div>
+        <div><input type="number" id="wIn" value="8" step="0.5" title="Width (in)"></div>
+        <div><input type="number" id="hIn" value="10" step="0.5" title="Height (in)"></div>
       </div>
       <input type="number" id="dpiIn" value="150" step="25" title="Output DPI" style="margin-top:8px;">
       <label style="display:flex;align-items:center;gap:6px;margin-top:10px;" title="Add 0.125&quot; Bleed + Crop Marks">
