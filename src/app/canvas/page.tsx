@@ -109,6 +109,15 @@ export default function DrawPage() {
   .texture-box.open{display:flex;}
   .tex-swatch{width:38px;height:38px;border-radius:4px;border:2px solid var(--line);cursor:pointer;padding:0;}
   .tex-swatch.active{border-color:var(--gold);}
+  .prompt-chips{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px;background:#15110b;border:1px solid var(--line);border-radius:4px;}
+  .chip-label{font-size:10.5px;letter-spacing:1.5px;color:var(--gold-dim);text-transform:uppercase;}
+  .chip-row{display:flex;flex-wrap:wrap;gap:5px;}
+  .prompt-chip{background:#1c1712;border:1px solid var(--line);color:var(--text-dim);padding:4px 9px;
+    border-radius:12px;font-size:11.5px;cursor:pointer;white-space:nowrap;}
+  .prompt-chip:hover{border-color:var(--gold-dim);color:var(--gold);}
+  .prompt-chip.active{border-color:var(--gold);color:var(--gold);background:#271d10;}
+  .chip-clear{align-self:flex-start;background:none;border:none;color:var(--text-dim);font-size:11px;
+    text-decoration:underline;cursor:pointer;padding:0;margin-top:2px;}
   .menu-panel{display:none;}
   .menu-panel.open{display:block;}
   details.menu-cat{border-bottom:1px solid var(--line);padding:4px 0;}
@@ -159,7 +168,7 @@ export default function DrawPage() {
         <button class="val-circle" data-color="#ffffff" title="White" style="background:#fff"></button>
         <button class="val-circle" data-color="#9c9c9c" title="Mid Grey" style="background:#9c9c9c"></button>
         <span class="rail-div"></span>
-        <button class="icon-btn" id="textureToggle" title="Paper Texture">▦</button>
+        <button class="icon-btn" id="textureToggle" title="Surface">▦</button>
       </div>
 
       <div class="texture-box" id="textureBox"></div>
@@ -376,18 +385,63 @@ export default function DrawPage() {
         <option value="ink">Ink Illustration</option>
         <option value="marker">Marker Illustration</option>
         <option value="pastel">Soft Pastel Painting</option>
+        <option value="watercolor">Watercolor</option>
+        <option value="acrylic">Acrylic</option>
         <option value="oil-allaprima">Oil — Alla Prima</option>
         <option value="oil-impasto">Oil — Impasto</option>
+        <option value="monochromatic">Monochromatic</option>
       </select>
+
+      <label class="small">Art Prompting</label>
+      <div class="prompt-chips" id="artPromptingBox">
+        <div>
+          <div class="chip-label">Lighting</div>
+          <div class="chip-row" data-chip-group="lighting">
+            <button class="prompt-chip" type="button">dramatic lighting</button>
+            <button class="prompt-chip" type="button">soft diffused light</button>
+            <button class="prompt-chip" type="button">golden hour light</button>
+            <button class="prompt-chip" type="button">high contrast chiaroscuro</button>
+          </div>
+        </div>
+        <div>
+          <div class="chip-label">Palette &amp; Mood</div>
+          <div class="chip-row" data-chip-group="palette">
+            <button class="prompt-chip" type="button">warm palette</button>
+            <button class="prompt-chip" type="button">cool palette</button>
+            <button class="prompt-chip" type="button">muted earth tones</button>
+            <button class="prompt-chip" type="button">vivid saturated color</button>
+          </div>
+        </div>
+        <div>
+          <div class="chip-label">Composition</div>
+          <div class="chip-row" data-chip-group="composition">
+            <button class="prompt-chip" type="button">tight close-up</button>
+            <button class="prompt-chip" type="button">dramatic negative space</button>
+            <button class="prompt-chip" type="button">rule-of-thirds framing</button>
+            <button class="prompt-chip" type="button">centered symmetry</button>
+          </div>
+        </div>
+        <div>
+          <div class="chip-label">Texture &amp; Finish</div>
+          <div class="chip-row" data-chip-group="texture">
+            <button class="prompt-chip" type="button">visible brushwork</button>
+            <button class="prompt-chip" type="button">soft blended edges</button>
+            <button class="prompt-chip" type="button">heavy impasto texture</button>
+            <button class="prompt-chip" type="button">fine linework detail</button>
+          </div>
+        </div>
+        <button class="chip-clear" id="clearPromptBtn" type="button">Clear prompt</button>
+      </div>
+
       <label class="small">Prompt (optional)</label>
-      <textarea id="autoPaintPrompt" rows="3" placeholder="Describe what to paint. With a reference photo loaded, this is optional -- leave it blank to just restyle the photo." style="width:100%;background:#1c1712;border:1px solid var(--line);color:var(--text);padding:7px;border-radius:3px;font-size:13.5px;resize:vertical;"></textarea>
+      <textarea id="autoPaintPrompt" rows="3" placeholder="Describe what to paint, or tap chips above to build it. With a reference photo loaded, this is optional -- leave it blank to just restyle the photo." style="width:100%;background:#1c1712;border:1px solid var(--line);color:var(--text);padding:7px;border-radius:3px;font-size:13.5px;resize:vertical;"></textarea>
       <button class="btn primary" id="autoPaintBtn" style="margin-top:8px;">Auto Paint</button>
       <div class="hint" id="autoPaintHint"></div>
 
       <select id="presetSel" title="Export Size" style="margin-top:14px;"></select>
       <div class="row" style="margin-top:8px;">
-        <div><input type="number" id="wIn" value="8" step="0.5" title="Width (in)"></div>
-        <div><input type="number" id="hIn" value="10" step="0.5" title="Height (in)"></div>
+        <div><input type="number" id="wIn" value="8" step="0.5" max="14" title="Width (in) -- 14in max"></div>
+        <div><input type="number" id="hIn" value="10" step="0.5" max="14" title="Height (in) -- 14in max"></div>
       </div>
       <input type="number" id="dpiIn" value="150" step="25" title="Output DPI" style="margin-top:8px;">
       <select id="formatSel" style="margin-top:8px;" title="File Format">
@@ -417,7 +471,7 @@ export default function DrawPage() {
     </div>
   </div>
 </div>` }} />
-      <Script src="/draw-engine.js?v=3" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=4" strategy="afterInteractive" />
     </>
   );
 }

@@ -17,36 +17,110 @@ let nextLayerId = 2;
 let medium = 'graphite', variant='hb';
 let color = '#1a1a1a';
 let brushSize = 14;
-let paperType = 'smooth';
+let paperType = 'bristol'; // which of the 6 SURFACES is active -- see SURFACES below
 let pressureMode = 'auto';
 let lastPt = null, lastTime = 0;
 
-// ---------- paper texture ----------
+// ---------- surfaces ----------
+// Six real working supports, standing in for what a studio actually keeps
+// on hand -- a panel, two weights of linen, watercolor stock, vellum, and
+// glass for stained-glass-style abstracts. Each gets its own base tone and
+// a grain/weave pass built to actually look like that material, not just a
+// tinted rectangle. All deterministic (seeded rnd) so screen and export match.
 function paperBase(type){
-  if(type==='toned') return '#8d8579';
-  if(type==='canvas') return '#e9e1cd';
-  if(type==='coldpress') return '#f3efe4';
-  return '#536878'; /* Payne's Grey — default surface, easier on the eyes than white */
+  if(type==='birch')        return '#dcc39a';  /* raw birch panel, warm tan */
+  if(type==='linenrug')     return '#d8cdb3';  /* coarse rug linen, oatmeal */
+  if(type==='belgianlinen') return '#e4dcc8';  /* fine Belgian linen, pale warm */
+  if(type==='arches')       return '#f4efe1';  /* 300gsm cold-press watercolor stock */
+  if(type==='bristol')      return '#f7f5ef';  /* smooth bristol vellum */
+  if(type==='glass')        return '#14171c';  /* near-black, reads as clear glass under paint */
+  return '#536878';
 }
 function drawPaper(ctx){
   ctx.save();
   ctx.setTransform(1,0,0,1,0,0);
+  const w = cv.width, h = cv.height;
   ctx.fillStyle = paperBase(paperType);
-  ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.fillRect(0,0,w,h);
+
   // deterministic grain so screen + export match
   let seed = 42;
   function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
-  const density = paperType==='canvas' ? 2600 : paperType==='coldpress' ? 1800 : paperType==='toned' ? 1500 : 900;
-  for(let i=0;i<density;i++){
-    const x = rnd()*cv.width, y = rnd()*cv.height;
-    const r = (paperType==='canvas' ? 1.6 : 0.8) + rnd()*1.2;
-    const dark = rnd() > 0.5;
-    ctx.fillStyle = dark ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-  }
-  if(paperType==='canvas'){
-    ctx.strokeStyle='rgba(0,0,0,0.04)'; ctx.lineWidth=1;
-    for(let x=0;x<cv.width;x+=5){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+cv.height,cv.height); ctx.stroke(); }
+
+  if (paperType === 'birch') {
+    // wood grain: long, slightly wavy horizontal streaks of alternating warm/dark tone
+    for (let i=0; i<70; i++){
+      const y = rnd()*h;
+      const amp = 4+rnd()*10, freq = 0.004+rnd()*0.01, dark = rnd()>0.45;
+      ctx.strokeStyle = dark ? 'rgba(90,60,25,0.07)' : 'rgba(255,235,195,0.10)';
+      ctx.lineWidth = 0.6+rnd()*1.8;
+      ctx.beginPath();
+      for (let x=0; x<=w; x+=8){ const yy = y + Math.sin(x*freq + i)*amp; if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy); }
+      ctx.stroke();
+    }
+    // occasional knot
+    for (let i=0;i<3;i++){
+      const kx = rnd()*w, ky = rnd()*h, kr = 6+rnd()*10;
+      const g = ctx.createRadialGradient(kx,ky,0,kx,ky,kr);
+      g.addColorStop(0,'rgba(70,45,18,0.22)'); g.addColorStop(1,'rgba(70,45,18,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(kx,ky,kr,0,Math.PI*2); ctx.fill();
+    }
+  } else if (paperType === 'linenrug' || paperType === 'belgianlinen') {
+    // woven crosshatch -- rug linen is coarser/looser, Belgian linen finer/tighter
+    const coarse = paperType === 'linenrug';
+    const step = coarse ? 7 : 4;
+    const alpha = coarse ? 0.07 : 0.045;
+    ctx.lineWidth = coarse ? 1.1 : 0.7;
+    ctx.strokeStyle = `rgba(70,58,34,${alpha})`;
+    for (let x=0; x<w; x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    ctx.strokeStyle = `rgba(255,250,235,${alpha+0.02})`;
+    for (let y=0; y<h; y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    const density = coarse ? 2000 : 1200;
+    for (let i=0;i<density;i++){
+      const x=rnd()*w, y=rnd()*h, dark=rnd()>0.5;
+      ctx.fillStyle = dark ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)';
+      ctx.beginPath(); ctx.arc(x,y,(coarse?1.3:0.7)+rnd(),0,Math.PI*2); ctx.fill();
+    }
+  } else if (paperType === 'arches') {
+    // heavy cold-press tooth -- dense irregular fiber texture, highest density of the set
+    for (let i=0;i<3000;i++){
+      const x=rnd()*w, y=rnd()*h, r=0.6+rnd()*1.4, dark=rnd()>0.48;
+      ctx.fillStyle = dark ? 'rgba(90,75,45,0.06)' : 'rgba(255,255,250,0.08)';
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+  } else if (paperType === 'bristol') {
+    // smooth vellum -- faint, sparse grain only, built for clean linework
+    for (let i=0;i<500;i++){
+      const x=rnd()*w, y=rnd()*h, dark=rnd()>0.5;
+      ctx.fillStyle = dark ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)';
+      ctx.beginPath(); ctx.arc(x,y,0.5+rnd()*0.6,0,Math.PI*2); ctx.fill();
+    }
+  } else if (paperType === 'glass') {
+    // stained-glass pane: a loose leading grid over a clear/dark base, plus a
+    // soft diagonal sheen -- built for bold flat color blocks between the lines
+    const cols = 4+Math.floor(rnd()*2), rows = 5+Math.floor(rnd()*2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3;
+    for (let i=1;i<cols;i++){
+      const x = (w/cols)*i + (rnd()-0.5)*18;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+(rnd()-0.5)*30,h); ctx.stroke();
+    }
+    for (let j=1;j<rows;j++){
+      const y = (h/rows)*j + (rnd()-0.5)*18;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y+(rnd()-0.5)*30); ctx.stroke();
+    }
+    const sheen = ctx.createLinearGradient(0,0,w,h);
+    sheen.addColorStop(0,'rgba(255,255,255,0.05)');
+    sheen.addColorStop(0.5,'rgba(255,255,255,0)');
+    sheen.addColorStop(1,'rgba(255,255,255,0.03)');
+    ctx.fillStyle = sheen; ctx.fillRect(0,0,w,h);
+  } else {
+    // fallback: original neutral grain
+    const density = 900;
+    for(let i=0;i<density;i++){
+      const x = rnd()*w, y = rnd()*h, r = 0.8+rnd()*1.2, dark = rnd() > 0.5;
+      ctx.fillStyle = dark ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)';
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -379,13 +453,19 @@ document.querySelector('.tile[data-medium="graphite"][data-variant="hb"]').class
 
 const textureBox = document.getElementById('textureBox');
 const textureToggle = document.getElementById('textureToggle');
-const TEXTURES = [
-  {type:'smooth', label:'Smooth Bristol'},
-  {type:'coldpress', label:'Cold Press Paper'},
-  {type:'canvas', label:'Rough Canvas'},
-  {type:'toned', label:'Toned Gray'},
+// The six working surfaces. Max export size is capped to 11x14in everywhere
+// (see PRESETS below) -- plenty for these supports, and the size that keeps
+// exports well clear of the out-of-memory territory the old industrial
+// presets hit.
+const SURFACES = [
+  {type:'birch', label:'Cradle Birch Panel'},
+  {type:'linenrug', label:'Linen Rug'},
+  {type:'belgianlinen', label:'Belgian Linen'},
+  {type:'arches', label:'Arches 300gsm Watercolor'},
+  {type:'bristol', label:'Bristol Vellum'},
+  {type:'glass', label:'Glass — Stained Glass Abstract'},
 ];
-TEXTURES.forEach(t=>{
+SURFACES.forEach(t=>{
   const b = document.createElement('button');
   b.className = 'tex-swatch' + (t.type===paperType ? ' active':'');
   b.title = t.label;
@@ -554,13 +634,15 @@ window.addEventListener('resize', applyZoom);
 // Sizes kept to what a browser tab can safely render -- the old industrial
 // sign/banner/mural presets (up to 48x96in @300dpi) built canvases of 100M+
 // pixels, which was enough on its own to push some machines into system-wide
-// out-of-memory territory. Max preset here (2400x3000px) stays well under
-// that, while still being plenty sharp for normal printing.
+// out-of-memory territory. 11x14 is the hard ceiling for every surface this
+// app offers (panel, linen, watercolor stock, vellum, glass) -- nothing here
+// goes bigger, on purpose, so an export can never get near OOM territory
+// again regardless of what preset or custom size is picked.
+const MAX_IN = 14; // longest edge allowed, inches
 const PRESETS = [
   {name:'Web / Screen — 10×13in @100dpi', w:10,h:13,dpi:100},
   {name:'Standard Print — 8×10in @150dpi', w:8,h:10,dpi:150},
   {name:'Large Print — 11×14in @150dpi', w:11,h:14,dpi:150},
-  {name:'Poster — 16×20in @150dpi', w:16,h:20,dpi:150},
   {name:'Custom', w:null,h:null,dpi:null}
 ];
 const presetSel = document.getElementById('presetSel');
@@ -573,7 +655,11 @@ presetSel.addEventListener('change', ()=>{
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
   const bleed = document.getElementById('bleedChk').checked ? 0.125 : 0;
-  const dpi = Number(dpiIn.value), wInches=Number(wIn.value)+bleed*2, hInches=Number(hIn.value)+bleed*2;
+  const dpi = Number(dpiIn.value);
+  const wInClamped = Math.min(Number(wIn.value), MAX_IN), hInClamped = Math.min(Number(hIn.value), MAX_IN);
+  if (wInClamped !== Number(wIn.value)) wIn.value = wInClamped;
+  if (hInClamped !== Number(hIn.value)) hIn.value = hInClamped;
+  const wInches=wInClamped+bleed*2, hInches=hInClamped+bleed*2;
   const pxW = Math.round(wInches*dpi), pxH = Math.round(hInches*dpi);
   const off = document.createElement('canvas'); off.width=pxW; off.height=pxH;
   const octx = off.getContext('2d');
@@ -660,8 +746,11 @@ const STYLE_PROMPTS = {
   ink: 'rendered as an ink illustration, confident linework, high contrast',
   marker: 'rendered as a marker illustration, flat bold color blocking, clean edges',
   pastel: 'rendered as a soft pastel painting, chalky texture, blended color transitions',
+  watercolor: 'rendered as a watercolor painting, transparent washes, visible paper texture, soft pooled edges, granulating pigment',
+  acrylic: 'rendered as an acrylic painting, flat opaque color, crisp layered edges, matte surface',
   'oil-allaprima': 'rendered as an alla prima oil painting, wet-on-wet brushwork, visible brush strokes',
   'oil-impasto': 'rendered as an impasto oil painting, thick textured paint, heavy palette knife strokes',
+  monochromatic: 'rendered in a strict monochromatic palette -- a single hue carried across every value from darkest shadow to lightest highlight, no other colors present',
 };
 
 const styleSel = document.getElementById('styleSel');
@@ -669,6 +758,24 @@ const autoPaintPrompt = document.getElementById('autoPaintPrompt');
 const autoPaintBtn = document.getElementById('autoPaintBtn');
 const autoPaintHint = document.getElementById('autoPaintHint');
 const DEFAULT_AUTOPAINT_HINT = autoPaintHint.textContent;
+
+// ---------- Art Prompting chips ----------
+// Quick-add descriptors so the artist can build a real prompt (lighting,
+// palette, composition, texture) by tapping instead of writing it out --
+// each chip just appends its phrase into the same textarea Auto Paint reads.
+document.querySelectorAll('#artPromptingBox .prompt-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    const phrase = chip.textContent.trim();
+    const current = autoPaintPrompt.value.trim();
+    autoPaintPrompt.value = current ? `${current}, ${phrase}` : phrase;
+    chip.classList.add('active');
+    setTimeout(()=>chip.classList.remove('active'), 180);
+  });
+});
+const clearPromptBtn = document.getElementById('clearPromptBtn');
+if (clearPromptBtn){
+  clearPromptBtn.addEventListener('click', ()=>{ autoPaintPrompt.value = ''; });
+}
 
 // Keep the style dropdown roughly in sync with whichever brush tile is active,
 // as a starting point -- the artist can still override it before painting.
