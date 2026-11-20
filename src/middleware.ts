@@ -1,13 +1,19 @@
 // Gates the whole app behind login. Anything other than /login, the magic
-// link callback, and Next's own internals/assets redirects to /login when
-// there's no signed-in Supabase session; signed-in visitors to /login get
-// bounced straight into the app.
+// link callback/confirm, and Next's own internals/assets redirects to /login
+// when there's no signed-in Supabase session; signed-in visitors to /login
+// get bounced straight into the app. The gate only applies in production —
+// local dev (npm run dev) always goes straight to the canvas, since the
+// point of the gate is to lock the public deployment, not your own machine.
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/confirm', '/api/covers'];
 
 export async function middleware(request: NextRequest) {
+  if (process.env.NODE_ENV !== 'production') {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
