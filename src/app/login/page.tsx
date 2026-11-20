@@ -7,7 +7,8 @@ export default function LoginPage() {
   const [covers, setCovers] = useState<string[]>([]);
   const [cover, setCover] = useState<string | null>(null);
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [code, setCode] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function LoginPage() {
       .catch(() => {});
   }, []);
 
-  async function sendLink(e: React.FormEvent) {
+  async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
     setStatus('sending');
@@ -31,7 +32,6 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         shouldCreateUser: true,
       },
     });
@@ -40,6 +40,25 @@ export default function LoginPage() {
       setErrorMsg(error.message);
     } else {
       setStatus('sent');
+    }
+  }
+
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setStatus('verifying');
+    setErrorMsg('');
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code.trim(),
+      type: 'email',
+    });
+    if (error) {
+      setStatus('sent');
+      setErrorMsg(error.message);
+    } else {
+      window.location.href = '/';
     }
   }
 
@@ -72,9 +91,12 @@ export default function LoginPage() {
         .gate input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);
           padding:13px 14px;border-radius:8px;font-size:15px;margin-bottom:16px;}
         .gate input:focus{outline:none;border-color:var(--gold-dim);}
+        .gate input.code{letter-spacing:6px;font-size:20px;text-align:center;}
         .gate button{width:100%;background:var(--gold);color:#1a1405;border:none;padding:13px 14px;
           border-radius:8px;font-size:14px;font-weight:600;letter-spacing:.5px;cursor:pointer;}
         .gate button:disabled{opacity:.6;cursor:default;}
+        .gate button.link{background:none;color:var(--text-dim);margin-top:12px;padding:0;font-weight:400;
+          text-decoration:underline;width:auto;}
         .gate .msg{margin-top:16px;font-size:13.5px;line-height:1.5;}
         .gate .msg.ok{color:var(--gold);}
         .gate .msg.err{color:#e2685f;}
@@ -88,25 +110,47 @@ export default function LoginPage() {
           )}
         </div>
         <div className="panel">
-          <form onSubmit={sendLink}>
-            <div className="logo">VERIDIAN <b>Q</b></div>
-            <div className="tag">Sign in to paint</div>
-            <label htmlFor="email">Email</label>
-            <input
-              id="email" type="email" required placeholder="you@example.com"
-              value={email} onChange={e => setEmail(e.target.value)}
-              disabled={status === 'sending' || status === 'sent'}
-            />
-            <button type="submit" disabled={status === 'sending' || status === 'sent'}>
-              {status === 'sending' ? 'Sending…' : 'Send Magic Link'}
-            </button>
-            {status === 'sent' && (
-              <div className="msg ok">Check your email — click the link we sent to sign in. First time here? The same link creates your account.</div>
-            )}
-            {status === 'error' && (
-              <div className="msg err">{errorMsg || 'Something went wrong sending that link.'}</div>
-            )}
-          </form>
+          {status === 'sent' || status === 'verifying' ? (
+            <form onSubmit={verifyCode}>
+              <div className="logo">VERIDIAN <b>Q</b></div>
+              <div className="tag">Enter your code</div>
+              <label htmlFor="code">6-digit code</label>
+              <input
+                id="code" className="code" type="text" inputMode="numeric" pattern="[0-9]*"
+                maxLength={6} autoFocus placeholder="000000"
+                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                disabled={status === 'verifying'}
+              />
+              <button type="submit" disabled={status === 'verifying' || code.trim().length < 6}>
+                {status === 'verifying' ? 'Verifying…' : 'Verify & Sign In'}
+              </button>
+              <div className="msg ok">We emailed a 6-digit code to {email.trim()}. Enter it above — no need to click anything in the email.</div>
+              {errorMsg && <div className="msg err">{errorMsg}</div>}
+              <button
+                type="button" className="link"
+                onClick={() => { setStatus('idle'); setCode(''); setErrorMsg(''); }}
+              >
+                Use a different email
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={sendCode}>
+              <div className="logo">VERIDIAN <b>Q</b></div>
+              <div className="tag">Sign in to paint</div>
+              <label htmlFor="email">Email</label>
+              <input
+                id="email" type="email" required placeholder="you@example.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                disabled={status === 'sending'}
+              />
+              <button type="submit" disabled={status === 'sending'}>
+                {status === 'sending' ? 'Sending…' : 'Send Code'}
+              </button>
+              {status === 'error' && (
+                <div className="msg err">{errorMsg || 'Something went wrong sending that code.'}</div>
+              )}
+            </form>
+          )}
         </div>
       </div>
     </>
