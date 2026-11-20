@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [covers, setCovers] = useState<string[]>([]);
@@ -43,7 +44,7 @@ export default function LoginPage() {
         .gate .logo{font-family:Georgia,"Times New Roman",serif;font-size:30px;letter-spacing:4px;margin-bottom:6px;}
         .gate .logo b{color:var(--gold);font-weight:400;}
         .gate .tag{font-size:11.5px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:34px;}
-        .gate a.enter{display:block;width:100%;background:var(--gold);color:#1a1405;border:none;
+        .gate a.enter, .gate .enter{display:block;width:100%;background:var(--gold);color:#1a1405;border:none;
           padding:13px 14px;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:.5px;
           cursor:pointer;text-align:center;text-decoration:none;}
         @media(min-width:760px){ .gate .art{display:block;} }
@@ -59,7 +60,7 @@ export default function LoginPage() {
           <div className="box">
             <div className="logo">VERIDIAN <b>Q</b></div>
             <div className="tag">Sign in to paint</div>
-            <a className="enter" href="/">Enter</a>
+            <Link className="enter" href="/">Enter</Link>
           </div>
         </div>
       </div>
