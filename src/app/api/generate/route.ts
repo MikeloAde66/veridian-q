@@ -36,11 +36,12 @@ export async function POST(req: Request) {
   const styleModifier = (body.styleModifier ?? '').trim();
   const imageUrl = body.imageUrl?.trim();
   // 0.75 was close to a full re-roll -- the model barely looked at the photo
-  // and mostly invented a new image from the text prompt, which is why a
-  // loaded reference photo came back as a different person entirely. 0.35
-  // keeps the source photo's subject, pose and composition intact while
-  // still letting the chosen medium (charcoal, oil, etc.) visibly repaint it.
-  const strength = typeof body.strength === 'number' ? body.strength : 0.35;
+  // and mostly invented a new image from the text prompt. 0.35 fixed the
+  // subject/composition drift, but still smoothed away fine detail (fur,
+  // texture, hard edges) toward a generic glossy look. 0.22 stays even
+  // closer to the source pixels so that kind of detail survives, while the
+  // chosen medium still visibly changes how it's rendered.
+  const strength = typeof body.strength === 'number' ? body.strength : 0.22;
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
         styleModifier,
         userPrompt,
         'keep the same subject, pose, framing and composition as the reference photo -- only the medium and rendering style change, nothing depicted should change',
+        'preserve every fine detail exactly as in the reference -- rough, scraggly, textured fur and hair, hard sharp edges, visible individual strands -- do not smooth, soften, blur, or simplify any edge or texture, do not make it glossy or airbrushed',
       ].filter(Boolean).join(', ')
     : [styleModifier, userPrompt].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
