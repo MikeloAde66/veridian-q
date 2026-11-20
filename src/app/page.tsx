@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 
 export default function LoginPage() {
   const [covers, setCovers] = useState<string[]>([]);
@@ -60,7 +59,7 @@ export default function LoginPage() {
           <div className="box">
             <div className="logo">VERIDIAN <b>Q</b></div>
             <div className="tag">Sign in to paint</div>
-            <Link className="enter" href="/canvas">Enter</Link>
+            <button type="button" className="enter" onClick={() => { window.location.href = '/canvas'; }}>Enter</button>
           </div>
         </div>
       </div>
