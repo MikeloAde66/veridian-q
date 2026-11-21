@@ -482,12 +482,12 @@ export default function DrawPage() {
           <div>
             <div class="chip-label">Artist Style</div>
             <div class="chip-row" data-chip-group="artist">
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/monet.png')">in the style of Monet</button>
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/picasso.png')">in the style of Picasso</button>
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/davinci.png')">in the style of Da Vinci</button>
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rubens.png')">in the style of Rubens</button>
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rembrandt.png')">in the style of Rembrandt</button>
-              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/charles-white.png')">in the style of Charles White</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/monet.png')" data-prompt="in the style of French Impressionist painter Claude Monet -- broken color, visible short brushstrokes, soft atmospheric natural light, plein air color harmony">Monet (Impressionist light)</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/picasso.png')" data-prompt="in the style of Cubist painter Pablo Picasso -- flattened overlapping planes, bold black outlines, angular faceted forms, fragmented multi-angle perspective">Picasso (Cubist)</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/davinci.png')" data-prompt="in the style of Renaissance painter Leonardo da Vinci -- smoky sfumato shading, soft blended tonal transitions, subtle anatomical modeling">Da Vinci (sfumato)</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rubens.png')" data-prompt="in the style of Baroque painter Peter Paul Rubens -- dynamic diagonal composition, lush fleshy volume, rich warm oil glazes, dramatic movement">Rubens (Baroque)</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rembrandt.png')" data-prompt="in the style of Dutch Golden Age painter Rembrandt van Rijn -- dramatic chiaroscuro, warm glowing pool of light, thick textured impasto highlights">Rembrandt (chiaroscuro)</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/charles-white.png')" data-prompt="in the style of African-American artist Charles White -- bold charcoal and graphite figure drawing, sculptural cross-hatching, monumental social-realist portraiture">Charles White (charcoal realism)</button>
             </div>
           </div>
           <button class="chip-clear" id="clearPromptBtn" type="button">Clear prompt</button>

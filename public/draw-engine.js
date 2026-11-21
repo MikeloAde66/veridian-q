@@ -1119,7 +1119,10 @@ const DEFAULT_AUTOPAINT_HINT = autoPaintHint.textContent;
 // each chip just appends its phrase into the same textarea Auto Paint reads.
 document.querySelectorAll('#artPromptingBox .prompt-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
-    const phrase = chip.textContent.trim();
+    // Some chips (e.g. Artist Style) show a short label but need to append a
+    // longer, disambiguated phrase -- data-prompt carries that; chips with no
+    // data-prompt fall back to their visible text, unchanged from before.
+    const phrase = (chip.dataset.prompt || chip.textContent).trim();
     const current = autoPaintPrompt.value.trim();
     autoPaintPrompt.value = current ? `${current}, ${phrase}` : phrase;
     chip.classList.add('active');
