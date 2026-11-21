@@ -299,6 +299,19 @@ function stampPastel(ctx,x,y,size,p,col,j,variant){
     ctx.beginPath(); ctx.arc(x,y,size*0.5,0,Math.PI*2); ctx.fill();
   }
 }
+// Palette-knife blade outlines -- normalized (-1..1) polygon points, traced
+// off the 5 real blades in the user's reference photo: a small diamond
+// point, a wide blunt-tipped trowel, a bigger diamond point, a narrow long
+// trowel, and a big wide trowel. Drawn as actual flat-edged polygons (see
+// wetMixPolygon) rather than the ellipse every other oil variant stamps,
+// since a real knife lays down a flat-edged chip of paint, not a blob.
+const KNIFE_BLADES = {
+  knife1: [[0,-1],[0.55,-0.1],[0.2,1],[-0.2,1],[-0.55,-0.1]],                 // small diamond point
+  knife2: [[-0.6,-1],[0.6,-1],[0.72,0.1],[0.45,1],[-0.45,1],[-0.72,0.1]],     // wide blunt chisel/spade
+  knife3: [[0,-1],[0.62,-0.25],[0.3,1],[-0.3,1],[-0.62,-0.25]],               // bigger diamond point
+  knife4: [[-0.3,-1],[0.3,-1],[0.4,0.3],[0.18,1],[-0.18,1],[-0.4,0.3]],       // narrow long trowel
+  knife5: [[-0.65,-1],[0.65,-1],[0.85,0.15],[0.4,1],[-0.4,1],[-0.85,0.15]],   // large wide trowel
+};
 const OIL_SHAPE = {
   allaprima: {shape:'round', w:0.5,  ratio:1,    a:0.9,  thick:false},
   impasto:   {shape:'round', w:0.5,  ratio:1,    a:0.9,  thick:true},
@@ -308,8 +321,63 @@ const OIL_SHAPE = {
   fan:       {shape:'fan',   w:0.5,  ratio:1,    a:0.45, thick:false},
   angle:     {shape:'flat',  w:0.5,  ratio:0.32, a:0.85, thick:false, skew:0.5},
   liner:     {shape:'round', w:0.12, ratio:1,    a:0.95, thick:false},
-  knife:     {shape:'knife', w:0.55, ratio:0.3,  a:1,    thick:true},
+  knife1:    {shape:'knife', w:0.34, ratio:1,    a:1,    thick:true, poly:KNIFE_BLADES.knife1},
+  knife2:    {shape:'knife', w:0.6,  ratio:0.6,  a:1,    thick:true, poly:KNIFE_BLADES.knife2},
+  knife3:    {shape:'knife', w:0.48, ratio:0.85, a:1,    thick:true, poly:KNIFE_BLADES.knife3},
+  knife4:    {shape:'knife', w:0.5,  ratio:1.3,  a:1,    thick:true, poly:KNIFE_BLADES.knife4},
+  knife5:    {shape:'knife', w:0.75, ratio:0.8,  a:1,    thick:true, poly:KNIFE_BLADES.knife5},
 };
+// Same read/blend/write-back wet-mix approach as wetMixEllipse, but tests
+// each pixel against a rotated/scaled polygon instead of an ellipse radius --
+// gives the knife shapes their real flat edges and points instead of a blob.
+function wetMixPolygon(ctx, cx, cy, scale, rot, poly, colorRgb, alpha){
+  if(typeof mixbox === 'undefined'){
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgb('+colorRgb.join(',')+')';
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot); ctx.scale(scale,scale);
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0],poly[0][1]);
+    for(let i=1;i<poly.length;i++) ctx.lineTo(poly[i][0],poly[i][1]);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const pad = 2;
+  const rr = scale*1.2;
+  const cw = ctx.canvas.width, ch = ctx.canvas.height;
+  const sx = Math.max(0, Math.floor(cx-rr-pad)), sy = Math.max(0, Math.floor(cy-rr-pad));
+  const ex = Math.min(cw, Math.ceil(cx+rr+pad)), ey = Math.min(ch, Math.ceil(cy+rr+pad));
+  const w = ex-sx, h = ey-sy;
+  if(w<=0 || h<=0) return;
+  const img = ctx.getImageData(sx, sy, w, h);
+  const d = img.data;
+  const cosR = Math.cos(-rot), sinR = Math.sin(-rot);
+  const n = poly.length;
+  for(let yy=0; yy<h; yy++){
+    for(let xx=0; xx<w; xx++){
+      const px = sx+xx - cx, py = sy+yy - cy;
+      let lx = (px*cosR - py*sinR)/scale, ly = (px*sinR + py*cosR)/scale;
+      // point-in-polygon (ray casting) against the normalized blade outline
+      let inside = false;
+      for(let i=0,j_=n-1; i<n; j_=i++){
+        const xi=poly[i][0], yi=poly[i][1], xj=poly[j_][0], yj=poly[j_][1];
+        const hit = ((yi>ly)!==(yj>ly)) && (lx < (xj-xi)*(ly-yi)/(yj-yi)+xi);
+        if(hit) inside = !inside;
+      }
+      if(!inside) continue;
+      const t = alpha;
+      const i = (yy*w+xx)*4;
+      if(d[i+3] < 12){
+        d[i]=colorRgb[0]; d[i+1]=colorRgb[1]; d[i+2]=colorRgb[2]; d[i+3]=Math.max(d[i+3], Math.round(t*255));
+        continue;
+      }
+      const mixed = mixbox.lerp([d[i],d[i+1],d[i+2]], colorRgb, t);
+      d[i]=mixed[0]; d[i+1]=mixed[1]; d[i+2]=mixed[2]; d[i+3]=255;
+    }
+  }
+  ctx.putImageData(img, sx, sy);
+}
 function stampOil(ctx,x,y,size,p,col,j,variant){
   ctx.globalCompositeOperation='source-over';
   const g = OIL_SHAPE[variant] || OIL_SHAPE.allaprima;
@@ -322,6 +390,13 @@ function stampOil(ctx,x,y,size,p,col,j,variant){
       const jj = j[i];
       wetMixEllipse(ctx, x+jj.dx*rx*0.7, y+jj.dy*rx*0.3, rx*0.22, ry*0.22*jj.r, jj.rot*0.3, colorRgb, a);
     }
+  } else if (g.shape==='knife' && g.poly){
+    // a flat-edged blade chip, not a blob -- size/pressure jitter kept
+    // modest since a real blade doesn't balloon the way a loaded brush does
+    const a = g.a*(0.88+j[0].a*0.2);
+    const scale = rx*(0.95+j[1].r*0.1);
+    const rot = j[0].rot*0.2;
+    wetMixPolygon(ctx, x, y, scale, rot, g.poly, colorRgb, a);
   } else {
     // vary density and footprint per stamp -- real paint doesn't lay down
     // with perfectly uniform coverage and thickness stroke to stroke

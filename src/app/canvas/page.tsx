@@ -260,7 +260,11 @@ export default function DrawPage() {
               <button class="tile" data-medium="oil" data-variant="fan">Fan</button>
               <button class="tile" data-medium="oil" data-variant="angle">Angle Shader</button>
               <button class="tile" data-medium="oil" data-variant="liner">Liner</button>
-              <button class="tile" data-medium="oil" data-variant="knife">Palette Knife</button>
+              <button class="tile" data-medium="oil" data-variant="knife1" title="Small diamond point">Knife 1</button>
+              <button class="tile" data-medium="oil" data-variant="knife2" title="Wide blunt chisel">Knife 2</button>
+              <button class="tile" data-medium="oil" data-variant="knife3" title="Large diamond point">Knife 3</button>
+              <button class="tile" data-medium="oil" data-variant="knife4" title="Narrow trowel">Knife 4</button>
+              <button class="tile" data-medium="oil" data-variant="knife5" title="Large wide trowel">Knife 5</button>
             </div>
           </details>
           <details class="menu-sub">
@@ -529,7 +533,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=14" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=15" strategy="afterInteractive" />
     </>
   );
 }
