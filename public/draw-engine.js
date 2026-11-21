@@ -457,8 +457,28 @@ function drawLayeredStrokes(ctx){
 }
 function fullRedraw(ctx){
   drawPaper(ctx);
+  drawReferenceImg(ctx);
   drawAutoPaintImg(ctx);
   drawLayeredStrokes(ctx);
+}
+// The reference photo is an on-screen tracing aid (css-positioned <img>, never
+// part of the paintable canvas), so by default it never shows up in an export --
+// only the paper and whatever was actually painted does. Checking "Include in
+// export" draws it into the base canvas too, object-fit:cover style (same crop
+// math the on-screen <img> uses), at whatever opacity it's currently set to, so
+// it bakes in as a backdrop under the strokes rather than replacing them.
+function drawReferenceImg(ctx){
+  const chk = document.getElementById('refExportChk');
+  if (!chk || !chk.checked) return;
+  if (!refImg || refImg.style.display === 'none' || !refImg.src || !refImg.naturalWidth) return;
+  const iw = refImg.naturalWidth, ih = refImg.naturalHeight;
+  const scale = Math.max(baseW/iw, baseH/ih);
+  const dw = iw*scale, dh = ih*scale;
+  const dx = (baseW-dw)/2, dy = (baseH-dh)/2;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = parseFloat(refImg.style.opacity) || 1;
+  ctx.drawImage(refImg, dx, dy, dw, dh);
+  ctx.globalAlpha = prevAlpha;
 }
 function redrawLiveStrokes(){
   ctx.clearRect(0,0,cv.width,cv.height);

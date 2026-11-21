@@ -379,6 +379,9 @@ export default function DrawPage() {
           <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;">
             <input type="checkbox" id="traceChk" style="width:auto;"> Trace
           </label>
+          <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;" title="Bake the reference photo into the exported file, under your strokes">
+            <input type="checkbox" id="refExportChk" style="width:auto;"> Include in export
+          </label>
         </div>
       </div>
       <div class="canvas-wrap" id="canvasWrap">
@@ -526,7 +529,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=13" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=14" strategy="afterInteractive" />
     </>
   );
 }
