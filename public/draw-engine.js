@@ -17,7 +17,7 @@ let nextLayerId = 2;
 let medium = 'graphite', variant='hb';
 let color = '#1a1a1a';
 let brushSize = 14;
-let paperType = 'bristol'; // which of the 6 SURFACES is active -- see SURFACES below
+let paperType = 'paynesgrey'; // which of the 7 SURFACES is active -- see SURFACES below
 
 // Auto Paint draws its generated image straight onto the paper canvas's own
 // pixels (pctx.drawImage below) so it sits under the brush strokes exactly
@@ -37,22 +37,81 @@ let lastPt = null, lastTime = 0;
 // ---------- surfaces ----------
 // Six real working supports, standing in for what a studio actually keeps
 // on hand -- a panel, two weights of linen, watercolor stock, vellum, and
-// glass for stained-glass-style abstracts. Each gets its own base tone and
-// a grain/weave pass built to actually look like that material, not just a
-// tinted rectangle. All deterministic (seeded rnd) so screen and export match.
+// glass for stained-glass-style abstracts. Each gets its own base tone again;
+// switching surfaces changes the grain/weave pass too (drawPaper() below).
+// All deterministic (seeded rnd) so screen and export match.
 function paperBase(type){
-  if(type==='birch')        return '#dcc39a';  /* raw birch panel, warm tan */
-  if(type==='linenrug')     return '#d8cdb3';  /* coarse rug linen, oatmeal */
-  if(type==='belgianlinen') return '#e4dcc8';  /* fine Belgian linen, pale warm */
-  if(type==='arches')       return '#f4efe1';  /* 300gsm cold-press watercolor stock */
-  if(type==='bristol')      return '#f7f5ef';  /* smooth bristol vellum */
+  if(type==='paynesgrey')   return '#536878';  /* Payne's Grey -- default canvas */
+  if(type==='birch')        return '#7d5a4d';  /* Burnt Umber -- real paint swatch, not the brighter web-color-list version */
+  if(type==='linenrug')     return '#ebe4d4';  /* off-white linen */
+  if(type==='belgianlinen') return '#efe9db';  /* off-white fine linen */
+  if(type==='arches')       return '#f8f6ef';  /* natural white watercolor paper */
+  if(type==='bristol')      return '#f8f6ef';  /* natural white bristol */
+  if(type==='fabriano')    return '#f8f6ef';  /* natural white, Italian cold-press watercolor paper */
+  if(type==='marble')       return '#e8e6e2';  /* bright white-grey Carrara marble */
+  if(type==='crackle')      return '#d9d2c3';  /* aged cream crackle paint */
   if(type==='glass')        return '#14171c';  /* near-black, reads as clear glass under paint */
   return '#536878';
 }
+// ---------- real material reference photos ----------
+// OpenArt-generated flat-lay macro photos, one per real-world surface --
+// replacing the earlier procedural grain with an actual photograph of the
+// material. Payne's Grey and Glass stay procedural: there's no real-world
+// material to photograph for either of those.
+const SURFACE_PHOTOS = {
+  birch:        '/surfaces/wood-panel.png',
+  linenrug:     '/surfaces/linen.png',
+  belgianlinen: '/surfaces/fine-linen.png',
+  arches:       '/surfaces/watercolor-paper.png',
+  bristol:      '/surfaces/bristol.png',
+  fabriano:     '/surfaces/italian-coldpress.png',
+  marble:       '/surfaces/marble.png',
+  crackle:      '/surfaces/crackle-paint.png',
+};
+const surfacePhotoImgs = {};
+Object.keys(SURFACE_PHOTOS).forEach(type => {
+  const img = new Image();
+  img.onload = () => {
+    // if this is the surface currently on screen, redraw now that the real
+    // photo is ready, so it swaps in without needing a surface change
+    if (paperType === type && typeof pctx !== 'undefined' && pctx) {
+      drawPaper(pctx);
+      drawAutoPaintImg(pctx);
+    }
+  };
+  img.src = SURFACE_PHOTOS[type];
+  surfacePhotoImgs[type] = img;
+});
+function drawSurfacePhoto(ctx, img){
+  const w = cv.width, h = cv.height;
+  const scale = Math.max(w/img.naturalWidth, h/img.naturalHeight);
+  const dw = img.naturalWidth*scale, dh = img.naturalHeight*scale;
+  const dx = (w-dw)/2, dy = (h-dh)/2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
 function drawPaper(ctx){
   ctx.save();
-  ctx.setTransform(1,0,0,1,0,0);
-  const w = cv.width, h = cv.height;
+  // Deliberately NOT resetting the transform here: the export routine
+  // pre-scales its offscreen context (octx.scale(pxW/baseW, pxH/baseH)) so
+  // that drawing in baseW x baseH logical units fills whatever real pixel
+  // size the chosen print preset needs. Resetting to identity here used to
+  // wipe that scale out, so anything drawn with a fixed baseW x baseH size
+  // (the surface photo, the grain) only ever covered the bottom-left
+  // baseW x baseH *pixels* of a larger export canvas -- harmless-looking
+  // with subtle procedural grain, but a hard, visible cutoff with a real
+  // photo. Always draw in baseW x baseH logical units and let whatever
+  // transform the caller already set up (identity on the live canvas,
+  // scaled on export) do the right thing.
+  const w = baseW, h = baseH;
+
+  const photo = surfacePhotoImgs[paperType];
+  if (photo && photo.complete && photo.naturalWidth > 0) {
+    drawSurfacePhoto(ctx, photo);
+    ctx.restore();
+    return;
+  }
+
   ctx.fillStyle = paperBase(paperType);
   ctx.fillRect(0,0,w,h);
 
@@ -112,7 +171,7 @@ function drawPaper(ctx){
     // stained-glass pane: a loose leading grid over a clear/dark base, plus a
     // soft diagonal sheen -- built for bold flat color blocks between the lines
     const cols = 4+Math.floor(rnd()*2), rows = 5+Math.floor(rnd()*2);
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3;
     for (let i=1;i<cols;i++){
       const x = (w/cols)*i + (rnd()-0.5)*18;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+(rnd()-0.5)*30,h); ctx.stroke();
@@ -187,28 +246,43 @@ function stampGraphite(ctx,x,y,size,p,col,j,variant){
 }
 function stampInk(ctx,x,y,size,p,col,j,variant){
   ctx.globalCompositeOperation='source-over';
+  const jj = j[0];
   const w = variant==='brush' ? size*0.6 : size*0.28;
-  const r = Math.max(1, w*(0.5+p*0.7));
+  const r = Math.max(1, w*(0.5+p*0.7)*(0.85+jj.r*0.3));
+  // a hair of wobble so the line doesn't read as a mechanically perfect
+  // arc repeated down the stroke -- real ink has some hand tremor to it
+  const wob = variant==='brush' ? size*0.04 : size*0.015;
+  const dx = x + jj.dx*wob, dy = y + jj.dy*wob;
   ctx.fillStyle = col;
   ctx.globalAlpha = 0.95;
-  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-  // wet edge bleed
+  ctx.beginPath(); ctx.arc(dx,dy,r,0,Math.PI*2); ctx.fill();
+  // wet edge bleed -- real ink pools unevenly, not an identical halo every stamp
   ctx.globalCompositeOperation='multiply';
-  ctx.globalAlpha = 0.12;
-  ctx.beginPath(); ctx.arc(x,y,r*1.6,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 0.08 + jj.a*0.09;
+  ctx.beginPath(); ctx.arc(dx,dy,r*(1.4+jj.r*0.5),0,Math.PI*2); ctx.fill();
   ctx.globalAlpha=1;
 }
 function stampMarker(ctx,x,y,size,p,col,j,variant){
   ctx.globalCompositeOperation='multiply';
-  const w = variant==='chisel' ? size*0.7 : size*0.5;
+  const jj = j[0];
+  const w = (variant==='chisel' ? size*0.7 : size*0.5) * (0.88+jj.r*0.24);
   ctx.fillStyle = col;
-  ctx.globalAlpha = 0.5;
+  // alcohol markers pool and overlap unevenly rather than laying down the
+  // exact same density every stamp -- jitter the alpha per stamp for that
+  const baseA = 0.4 + jj.a*0.22;
   if(variant==='chisel'){
-    ctx.save(); ctx.translate(x,y); ctx.rotate(0.5);
+    ctx.globalAlpha = baseA;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(0.5 + (jj.rot-0.5)*0.35);
     ctx.fillRect(-w*0.5,-size*0.12,w,size*0.24);
     ctx.restore();
   } else {
-    ctx.beginPath(); ctx.arc(x,y,w*0.5,0,Math.PI*2); ctx.fill();
+    // a hair of position wobble plus a soft low-alpha bleed ring breaks up
+    // the "beads on a string" look of identical stamped circles
+    const wob = size*0.05;
+    ctx.globalAlpha = baseA;
+    ctx.beginPath(); ctx.arc(x+jj.dx*wob,y+jj.dy*wob,w*0.5,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.06 + jj.a*0.05;
+    ctx.beginPath(); ctx.arc(x,y,w*0.75,0,Math.PI*2); ctx.fill();
   }
   ctx.globalAlpha=1;
 }
@@ -251,14 +325,17 @@ function stampOil(ctx,x,y,size,p,col,j,variant){
       ctx.fill();
     }
   } else {
-    ctx.globalAlpha = g.a;
+    // vary density and footprint per stamp -- real paint doesn't lay down
+    // with perfectly uniform coverage and thickness stroke to stroke
+    ctx.globalAlpha = g.a*(0.82+j[0].a*0.3);
     ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, g.skew ? g.skew : (j[0].rot*0.15), 0, Math.PI*2);
+    ctx.ellipse(x, y, rx*(0.9+j[1].r*0.2), ry*(0.9+j[1].r*0.2), g.skew ? g.skew : (j[0].rot*0.15), 0, Math.PI*2);
     ctx.fill();
   }
   if(g.thick){
-    // highlight ridge to fake paint thickness (heavier for the palette knife)
-    ctx.globalAlpha = g.shape==='knife' ? 0.35 : 0.25;
+    // highlight ridge to fake paint thickness (heavier for the palette knife),
+    // jittered so the ridge doesn't look like a decal stamped at fixed opacity
+    ctx.globalAlpha = (g.shape==='knife' ? 0.35 : 0.25) * (0.75+j[2].a*0.45);
     ctx.fillStyle='#ffffff';
     ctx.beginPath(); ctx.ellipse(x-rx*0.22,y-ry*0.26, rx*0.3, ry*0.5, 0,0,Math.PI*2); ctx.fill();
   }
@@ -467,29 +544,33 @@ document.querySelector('.tile[data-medium="graphite"][data-variant="hb"]').class
 
 const textureBox = document.getElementById('textureBox');
 const textureToggle = document.getElementById('textureToggle');
-// The six working surfaces. Max export size is capped to 11x14in everywhere
-// (see PRESETS below) -- plenty for these supports, and the size that keeps
-// exports well clear of the out-of-memory territory the old industrial
-// presets hit.
+// The seven working surfaces, picked from a dropdown rather than a swatch
+// grid. Max export size is capped to 11x14in everywhere (see PRESETS below)
+// -- plenty for these supports, and the size that keeps exports well clear
+// of the out-of-memory territory the old industrial presets hit.
 const SURFACES = [
-  {type:'birch', label:'Cradle Birch Panel'},
-  {type:'linenrug', label:'Linen Rug'},
-  {type:'belgianlinen', label:'Belgian Linen'},
-  {type:'arches', label:'Arches 300gsm Watercolor'},
-  {type:'bristol', label:'Bristol Vellum'},
+  {type:'paynesgrey', label:"Payne's Grey (default)"},
+  {type:'birch', label:'Wood Panel'},
+  {type:'linenrug', label:'Linen'},
+  {type:'belgianlinen', label:'Fine Linen'},
+  {type:'arches', label:'Watercolor Paper'},
+  {type:'bristol', label:'Bristol Smooth Surface'},
+  {type:'fabriano', label:'Italian Cold-Press Watercolor Paper'},
+  {type:'marble', label:'Marble'},
+  {type:'crackle', label:'Crackle Paint'},
   {type:'glass', label:'Glass — Stained Glass Abstract'},
 ];
+const surfaceSel = document.getElementById('surfaceSel');
 SURFACES.forEach(t=>{
-  const b = document.createElement('button');
-  b.className = 'tex-swatch' + (t.type===paperType ? ' active':'');
-  b.title = t.label;
-  b.style.background = paperBase(t.type);
-  b.addEventListener('click', ()=>{
-    paperType = t.type; drawPaper(pctx); drawAutoPaintImg(pctx);
-    document.querySelectorAll('.tex-swatch').forEach(s=>s.classList.remove('active'));
-    b.classList.add('active');
-  });
-  textureBox.appendChild(b);
+  const opt = document.createElement('option');
+  opt.value = t.type;
+  opt.textContent = t.label;
+  if (t.type === paperType) opt.selected = true;
+  surfaceSel.appendChild(opt);
+});
+surfaceSel.addEventListener('change', ()=>{
+  paperType = surfaceSel.value;
+  drawPaper(pctx); drawAutoPaintImg(pctx);
 });
 textureToggle.addEventListener('click', ()=>{
   const open = textureBox.classList.toggle('open');
@@ -505,7 +586,7 @@ menuToggle.addEventListener('click', ()=>{
 
 const colorPicker = document.getElementById('colorPicker');
 colorPicker.addEventListener('input', ()=> color = colorPicker.value);
-const PALETTE = ['#1a1a1a','#6b4226','#8a3324','#2e4a3a','#1c3a5e','#caa23d','#ffffff','#9c9c9c'];
+const PALETTE = ['#8a3324','#d3d3d3','#c98910','#da70d6','#ffffff']; // Burnt Umber, Light Grey, Yellow Ochre, Orchid, White
 const swEl = document.getElementById('swatches');
 PALETTE.forEach(c=>{
   const d=document.createElement('div'); d.className='swatch'; d.style.background=c;
@@ -522,7 +603,6 @@ document.querySelectorAll('.val-circle, .val-tile').forEach(btn=>{
     document.querySelectorAll(`.val-circle[data-color="${c}"]`).forEach(s=>s.classList.add('active'));
   });
 });
-document.querySelector('.val-circle[data-color="#ffffff"]').classList.add('active');
 
 const sizeSlider = document.getElementById('sizeSlider');
 const sizeVal = document.getElementById('sizeVal');
@@ -643,6 +723,13 @@ function applyZoom(){
 }
 zoomSlider.addEventListener('input', applyZoom);
 window.addEventListener('resize', applyZoom);
+const toolMagnify = document.getElementById('toolMagnify');
+if (toolMagnify){
+  toolMagnify.addEventListener('click', ()=>{
+    const on = document.body.classList.toggle('text-magnified');
+    toolMagnify.classList.toggle('active', on);
+  });
+}
 
 // ---------- export presets ----------
 // Sizes kept to what a browser tab can safely render -- the old industrial
@@ -1111,9 +1198,6 @@ document.querySelectorAll('.adj-slider').forEach(sl=>{
     out.textContent = sl.value;
     applyAdjustments();
   });
-});
-document.getElementById('signOutBtn').addEventListener('click', ()=>{
-  fetch('/api/signout', {method:'POST'}).finally(()=>{ window.location.href = '/login'; });
 });
 document.getElementById('adjResetBtn').addEventListener('click', ()=>{
   valueAdjust = 100; valueSlider.value = 100; valueVal.textContent = 100;

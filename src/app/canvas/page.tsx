@@ -27,21 +27,21 @@ export default function DrawPage() {
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   header .logo{font-family:Georgia,"Times New Roman",serif;font-size:24px;letter-spacing:4px;}
   header .logo b{color:var(--gold);font-weight:400;}
-  header .tag{font-size:11.5px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
+  header .tag{font-size:13px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
   .main{flex:1;display:flex;min-height:0;overflow:hidden;}
   aside{width:230px;flex:0 0 230px;background:var(--panel);overflow-y:auto;padding:14px;border-right:1px solid var(--line);}
   aside.right{border-right:none;border-left:1px solid var(--line);transition:width .15s,flex-basis .15s;}
   aside.right.collapsed{width:60px;flex:0 0 60px;padding:14px 8px;overflow:hidden;}
   aside.right.collapsed #rightBody{display:none;}
   #rightToggle{margin-bottom:10px;}
-  h3.sec{font-size:11.5px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
+  h3.sec{font-size:15px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
   h3.sec:first-child{margin-top:0;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  button.tile{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:9px 6px;
-    font-size:12.5px;letter-spacing:.5px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
+  button.tile{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:10px 7px;
+    font-size:14.5px;letter-spacing:.3px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
   button.tile:hover{border-color:var(--gold-dim);}
   button.tile.active{border-color:var(--gold);color:var(--gold);background:#231c10;}
-  label.small{display:block;font-size:11.5px;color:var(--text-dim);letter-spacing:1px;margin:10px 0 4px;text-transform:uppercase;}
+  label.small{display:block;font-size:14.5px;color:var(--text-dim);letter-spacing:.5px;margin:10px 0 4px;text-transform:uppercase;}
   input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:#2a2520;border-radius:2px;outline:none;}
   input[type=range]::-webkit-slider-runnable-track{height:4px;background:#2a2520;border-radius:2px;}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
@@ -72,7 +72,7 @@ export default function DrawPage() {
   .zoom-bar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-top:1px solid var(--line);background:var(--panel);}
   .zoom-bar input[type=range]{flex:1;}
   .zoom-bar .zlabel{font-size:12.5px;color:var(--text-dim);min-width:120px;text-align:right;letter-spacing:.5px;}
-  .hint{font-size:13.5px;color:var(--text-dim);line-height:1.5;margin-top:4px;}
+  .hint{font-size:15.5px;color:var(--text-dim);line-height:1.5;margin-top:4px;}
   .mini-monitor{display:flex;flex-direction:column;align-items:center;margin-top:10px;}
   .mini-monitor-screen{background:#0a0a0a;border:3px solid #3a342c;border-radius:6px;
     padding:6px;box-shadow:inset 0 0 6px rgba(0,0,0,.6);}
@@ -103,36 +103,36 @@ export default function DrawPage() {
   .icon-btn.active{border-color:var(--gold);color:var(--gold);background:#231c10;}
   .edit-rail .tile{width:30px;height:30px;flex:0 0 30px;padding:0;font-size:15px;display:flex;align-items:center;justify-content:center;}
   .rail-div{width:1px;align-self:stretch;background:var(--line);margin:0 2px;}
-  .val-circle{width:22px;height:22px;flex:0 0 22px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;}
-  .val-circle.active{border-color:var(--gold);}
-  .texture-box{display:none;flex-wrap:wrap;gap:6px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);}
-  .texture-box.open{display:flex;}
-  .tex-swatch{width:38px;height:38px;border-radius:4px;border:2px solid var(--line);cursor:pointer;padding:0;}
-  .tex-swatch.active{border-color:var(--gold);}
+  .texture-box{display:none;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);}
+  .texture-box.open{display:block;}
   .prompt-chips{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px;background:#15110b;border:1px solid var(--line);border-radius:4px;}
-  .chip-label{font-size:10.5px;letter-spacing:1.5px;color:var(--gold-dim);text-transform:uppercase;}
+  .chip-label{font-size:13.5px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
   .chip-row{display:flex;flex-wrap:wrap;gap:5px;}
-  .prompt-chip{background:#1c1712;border:1px solid var(--line);color:var(--text-dim);padding:4px 9px;
-    border-radius:12px;font-size:11.5px;cursor:pointer;white-space:nowrap;}
+  .prompt-chip{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:6px 11px;
+    border-radius:14px;font-size:14px;cursor:pointer;white-space:nowrap;}
+  .prompt-chip.style-chip{padding-left:38px;background-repeat:no-repeat;background-position:5px center;
+    background-size:26px 26px;}
   .prompt-chip:hover{border-color:var(--gold-dim);color:var(--gold);}
   .prompt-chip.active{border-color:var(--gold);color:var(--gold);background:#271d10;}
-  .chip-clear{align-self:flex-start;background:none;border:none;color:var(--text-dim);font-size:11px;
+  .chip-clear{align-self:flex-start;background:none;border:none;color:var(--text-dim);font-size:13.5px;
     text-decoration:underline;cursor:pointer;padding:0;margin-top:2px;}
   .menu-panel{display:none;}
   .menu-panel.open{display:block;}
   details.menu-cat{border-bottom:1px solid var(--line);padding:4px 0;}
-  details.menu-cat>summary{font-size:11.5px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
-    cursor:pointer;list-style:none;padding:6px 2px;}
+  details.menu-cat>summary{font-size:16.5px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;
+    cursor:pointer;list-style:none;padding:9px 2px;line-height:1.3;}
   details.menu-cat>summary::-webkit-details-marker{display:none;}
   details.menu-cat>summary::before{content:'▸  ';}
   details.menu-cat[open]>summary::before{content:'▾  ';}
-  details.menu-sub{margin:2px 0 2px 10px;}
-  details.menu-sub>summary{font-size:12px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;
-    cursor:pointer;list-style:none;padding:4px 2px;}
+  details.menu-sub{margin:0 0 0 10px;}
+  details.menu-sub>summary{font-size:15.5px;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;
+    cursor:pointer;list-style:none;padding:7px 2px;line-height:1.3;}
+  details.menu-sub>summary.med-icon{padding-left:38px;background-repeat:no-repeat;background-position:2px center;
+    background-size:26px 26px;}
   details.menu-sub>summary::-webkit-details-marker{display:none;}
   details.menu-sub>summary::before{content:'›  ';}
   details.menu-sub[open]>summary::before{content:'⌄  ';}
-  details.menu-sub .grid2{margin:4px 0 6px;}
+  details.menu-sub .grid2{margin:5px 0 8px;}
   #cropBox{position:absolute;left:0;top:0;width:0;height:0;border:2px dashed var(--gold);
     background:rgba(242,185,78,.12);display:none;pointer-events:none;}
   #rulerOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;}
@@ -145,9 +145,16 @@ export default function DrawPage() {
   #valueSlider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
   #valueSlider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
   .ruler-tile.active{border-color:var(--gold);color:var(--gold);background:#231c10;}
-  label.adj-label{display:block;font-size:11px;color:var(--text-dim);letter-spacing:.5px;margin:8px 0 2px;text-transform:uppercase;}
+  label.adj-label{display:block;font-size:13.5px;color:var(--text-dim);letter-spacing:.3px;margin:8px 0 2px;text-transform:uppercase;}
   input.adj-slider{margin:0 0 2px;}
   code.tag{background:#1c1712;padding:2px 5px;border-radius:3px;color:var(--gold);}
+  body.text-magnified .prompt-chip{font-size:17px;padding:8px 13px;}
+  body.text-magnified .chip-label{font-size:16px;}
+  body.text-magnified .hint{font-size:18.5px;}
+  body.text-magnified label.small,body.text-magnified label.adj-label{font-size:17px;}
+  body.text-magnified details.menu-cat>summary{font-size:19.5px;}
+  body.text-magnified details.menu-sub>summary{font-size:18.5px;}
+  body.text-magnified button.tile{font-size:17px;padding:11px 8px;}
 `}</style>
       <div dangerouslySetInnerHTML={{ __html: `<div id="app">
   <svg width="0" height="0" style="position:absolute;overflow:hidden;">
@@ -164,20 +171,16 @@ export default function DrawPage() {
         <button class="icon-btn tool-icon" id="toolCrop" title="Crop (drag a region, then Download/Copy it)">⬚</button>
         <button class="icon-btn tile" data-medium="eraser" data-variant="soft" title="Eraser">⌫</button>
         <span class="rail-div"></span>
-        <button class="val-circle" data-color="#000000" title="Black" style="background:#000"></button>
-        <button class="val-circle" data-color="#ffffff" title="White" style="background:#fff"></button>
-        <button class="val-circle" data-color="#9c9c9c" title="Mid Grey" style="background:#9c9c9c"></button>
-        <span class="rail-div"></span>
         <button class="icon-btn" id="textureToggle" title="Surface">▦</button>
       </div>
 
-      <div class="texture-box" id="textureBox"></div>
+      <div class="texture-box" id="textureBox"><select id="surfaceSel"></select></div>
 
       <div class="menu-panel" id="menuPanel">
         <details class="menu-cat">
           <summary>Brushes</summary>
           <details class="menu-sub">
-            <summary>Charcoal</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/charcoal.png')">Charcoal</summary>
             <div class="grid2">
               <button class="tile" data-medium="charcoal" data-variant="vine">Vine</button>
               <button class="tile" data-medium="charcoal" data-variant="compressed">Compressed</button>
@@ -187,7 +190,7 @@ export default function DrawPage() {
             </div>
           </details>
           <details class="menu-sub">
-            <summary>Pencil</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/pencil.png')">Pencil</summary>
             <div class="grid2">
               <button class="tile" data-medium="graphite" data-variant="hb">HB</button>
               <button class="tile" data-medium="graphite" data-variant="2b">2B</button>
@@ -198,28 +201,28 @@ export default function DrawPage() {
             </div>
           </details>
           <details class="menu-sub">
-            <summary>Ink</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/ink.png')">Ink</summary>
             <div class="grid2">
               <button class="tile" data-medium="ink" data-variant="liner">Fine Liner</button>
               <button class="tile" data-medium="ink" data-variant="brush">Brush Pen</button>
             </div>
           </details>
           <details class="menu-sub">
-            <summary>Markers</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/markers.png')">Markers</summary>
             <div class="grid2">
               <button class="tile" data-medium="marker" data-variant="alcohol">Alcohol</button>
               <button class="tile" data-medium="marker" data-variant="chisel">Chisel Tip</button>
             </div>
           </details>
           <details class="menu-sub">
-            <summary>Pastel</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/pastel.png')">Pastel</summary>
             <div class="grid2">
               <button class="tile" data-medium="pastel" data-variant="soft">Soft Pastel</button>
               <button class="tile" data-medium="pastel" data-variant="pencil">Pastel Pencil</button>
             </div>
           </details>
           <details class="menu-sub">
-            <summary>Painting</summary>
+            <summary class="med-icon" style="background-image:url('/brush-swatches/painting.png')">Painting</summary>
             <div class="grid2">
               <button class="tile" data-medium="oil" data-variant="allaprima">Alla Prima</button>
               <button class="tile" data-medium="oil" data-variant="impasto">Impasto</button>
@@ -245,6 +248,7 @@ export default function DrawPage() {
           <summary>Tools</summary>
           <div class="grid2">
             <button class="tile" data-medium="eraser" data-variant="soft">Eraser</button>
+            <button class="tile" id="toolMagnify" type="button" title="Enlarge small UI text for readability">🔍 Magnify Text</button>
           </div>
         </details>
 
@@ -322,7 +326,6 @@ export default function DrawPage() {
           <button class="btn" id="adjResetBtn" style="margin-top:8px;">Reset Adjustments</button>
         </details>
 
-        <button class="btn" id="signOutBtn" style="margin-top:4px;">Sign Out</button>
       </div>
     </aside>
 
@@ -392,46 +395,59 @@ export default function DrawPage() {
         <option value="monochromatic">Monochromatic</option>
       </select>
 
-      <label class="small">Art Prompting</label>
-      <div class="prompt-chips" id="artPromptingBox">
-        <div>
-          <div class="chip-label">Lighting</div>
-          <div class="chip-row" data-chip-group="lighting">
-            <button class="prompt-chip" type="button">dramatic lighting</button>
-            <button class="prompt-chip" type="button">soft diffused light</button>
-            <button class="prompt-chip" type="button">golden hour light</button>
-            <button class="prompt-chip" type="button">high contrast chiaroscuro</button>
+      <details class="menu-cat" id="artPromptingDetails">
+        <summary>Art Prompting</summary>
+        <div class="prompt-chips" id="artPromptingBox">
+          <div>
+            <div class="chip-label">Lighting</div>
+            <div class="chip-row" data-chip-group="lighting">
+              <button class="prompt-chip" type="button">dramatic lighting</button>
+              <button class="prompt-chip" type="button">soft diffused light</button>
+              <button class="prompt-chip" type="button">golden hour light</button>
+              <button class="prompt-chip" type="button">high contrast chiaroscuro</button>
+            </div>
           </div>
-        </div>
-        <div>
-          <div class="chip-label">Palette &amp; Mood</div>
-          <div class="chip-row" data-chip-group="palette">
-            <button class="prompt-chip" type="button">warm palette</button>
-            <button class="prompt-chip" type="button">cool palette</button>
-            <button class="prompt-chip" type="button">muted earth tones</button>
-            <button class="prompt-chip" type="button">vivid saturated color</button>
+          <div>
+            <div class="chip-label">Palette &amp; Mood</div>
+            <div class="chip-row" data-chip-group="palette">
+              <button class="prompt-chip" type="button">warm palette</button>
+              <button class="prompt-chip" type="button">cool palette</button>
+              <button class="prompt-chip" type="button">muted earth tones</button>
+              <button class="prompt-chip" type="button">vivid saturated color</button>
+            </div>
           </div>
-        </div>
-        <div>
-          <div class="chip-label">Composition</div>
-          <div class="chip-row" data-chip-group="composition">
-            <button class="prompt-chip" type="button">tight close-up</button>
-            <button class="prompt-chip" type="button">dramatic negative space</button>
-            <button class="prompt-chip" type="button">rule-of-thirds framing</button>
-            <button class="prompt-chip" type="button">centered symmetry</button>
+          <div>
+            <div class="chip-label">Composition</div>
+            <div class="chip-row" data-chip-group="composition">
+              <button class="prompt-chip" type="button">tight close-up</button>
+              <button class="prompt-chip" type="button">dramatic negative space</button>
+              <button class="prompt-chip" type="button">rule-of-thirds framing</button>
+              <button class="prompt-chip" type="button">centered symmetry</button>
+            </div>
           </div>
-        </div>
-        <div>
-          <div class="chip-label">Texture &amp; Finish</div>
-          <div class="chip-row" data-chip-group="texture">
-            <button class="prompt-chip" type="button">visible brushwork</button>
-            <button class="prompt-chip" type="button">soft blended edges</button>
-            <button class="prompt-chip" type="button">heavy impasto texture</button>
-            <button class="prompt-chip" type="button">fine linework detail</button>
+          <div>
+            <div class="chip-label">Texture &amp; Finish</div>
+            <div class="chip-row" data-chip-group="texture">
+              <button class="prompt-chip" type="button">visible brushwork</button>
+              <button class="prompt-chip" type="button">soft blended edges</button>
+              <button class="prompt-chip" type="button">heavy impasto texture</button>
+              <button class="prompt-chip" type="button">fine linework detail</button>
+            </div>
           </div>
+          <div>
+            <div class="chip-label">Artist Style</div>
+            <div class="chip-row" data-chip-group="artist">
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/monet.png')">in the style of Monet</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/picasso.png')">in the style of Picasso</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/davinci.png')">in the style of Da Vinci</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rubens.png')">in the style of Rubens</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/rembrandt.png')">in the style of Rembrandt</button>
+              <button class="prompt-chip style-chip" type="button" style="background-image:url('/artist-styles/charles-white.png')">in the style of Charles White</button>
+            </div>
+          </div>
+          <button class="chip-clear" id="clearPromptBtn" type="button">Clear prompt</button>
         </div>
-        <button class="chip-clear" id="clearPromptBtn" type="button">Clear prompt</button>
-      </div>
+      </details>
 
       <label class="small">Prompt (optional)</label>
       <textarea id="autoPaintPrompt" rows="3" placeholder="Describe what to paint, or tap chips above to build it. With a reference photo loaded, this is optional -- leave it blank to just restyle the photo." style="width:100%;background:#1c1712;border:1px solid var(--line);color:var(--text);padding:7px;border-radius:3px;font-size:13.5px;resize:vertical;"></textarea>
@@ -471,7 +487,7 @@ export default function DrawPage() {
     </div>
   </div>
 </div>` }} />
-      <Script src="/draw-engine.js?v=5" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=9" strategy="afterInteractive" />
     </>
   );
 }
