@@ -2,7 +2,7 @@
 const baseW = 1000, baseH = 1300;
 const stage = document.getElementById('stage');
 const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
+const ctx = cv.getContext('2d', {willReadFrequently: true});
 const paperCv = document.getElementById('paperCv');
 const pctx = paperCv.getContext('2d');
 const refImg = document.getElementById('refImg');
@@ -438,7 +438,7 @@ function drawStrokePoints(ctx, stroke, fromIdx){
 }
 const layerScratch = document.createElement('canvas');
 layerScratch.width = baseW; layerScratch.height = baseH;
-const lsctx = layerScratch.getContext('2d');
+const lsctx = layerScratch.getContext('2d', {willReadFrequently: true});
 function drawLayeredStrokes(ctx){
   // Layers stack bottom -> top; within a layer, strokes replay in the order
   // they were painted. Hidden layers (or ones faded to 0) are skipped
@@ -554,7 +554,7 @@ cv.addEventListener('pointermove', e=>{
 });
 function showCropExport(sx,sy,sw,sh){
   const off = document.createElement('canvas'); off.width=Math.round(sw); off.height=Math.round(sh);
-  const octx = off.getContext('2d');
+  const octx = off.getContext('2d', {willReadFrequently: true});
   octx.translate(-sx,-sy);
   octx.filter = adjustFilterString();
   fullRedraw(octx);
@@ -921,7 +921,7 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   const wInches=wInClamped+bleed*2, hInches=hInClamped+bleed*2;
   const pxW = Math.round(wInches*dpi), pxH = Math.round(hInches*dpi);
   const off = document.createElement('canvas'); off.width=pxW; off.height=pxH;
-  const octx = off.getContext('2d');
+  const octx = off.getContext('2d', {willReadFrequently: true});
   octx.save();
   octx.scale(pxW/baseW, pxH/baseH);
   octx.filter = adjustFilterString();
