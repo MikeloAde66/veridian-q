@@ -313,24 +313,24 @@ const OIL_SHAPE = {
 function stampOil(ctx,x,y,size,p,col,j,variant){
   ctx.globalCompositeOperation='source-over';
   const g = OIL_SHAPE[variant] || OIL_SHAPE.allaprima;
-  ctx.fillStyle = col;
+  const colorRgb = hexToRgbArr(col);
   const rx = size*g.w*(0.6+p*0.6);
   const ry = rx*g.ratio;
   if (g.shape==='fan'){
-    ctx.globalAlpha = g.a*(0.5+p*0.5);
+    const a = g.a*(0.5+p*0.5);
     for(let i=0;i<j.length;i++){
       const jj = j[i];
-      ctx.beginPath();
-      ctx.ellipse(x+jj.dx*rx*0.7, y+jj.dy*rx*0.3, rx*0.22, ry*0.22*jj.r, jj.rot*0.3, 0, Math.PI*2);
-      ctx.fill();
+      wetMixEllipse(ctx, x+jj.dx*rx*0.7, y+jj.dy*rx*0.3, rx*0.22, ry*0.22*jj.r, jj.rot*0.3, colorRgb, a);
     }
   } else {
     // vary density and footprint per stamp -- real paint doesn't lay down
     // with perfectly uniform coverage and thickness stroke to stroke
-    ctx.globalAlpha = g.a*(0.82+j[0].a*0.3);
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx*(0.9+j[1].r*0.2), ry*(0.9+j[1].r*0.2), g.skew ? g.skew : (j[0].rot*0.15), 0, Math.PI*2);
-    ctx.fill();
+    const a = g.a*(0.82+j[0].a*0.3);
+    const erx = rx*(0.9+j[1].r*0.2), ery = ry*(0.9+j[1].r*0.2);
+    const rot = g.skew ? g.skew : (j[0].rot*0.15);
+    // wet-in-wet: mixes with whatever's already on this layer instead of
+    // flatly overlaying it, so overlapping colors behave like real pigment
+    wetMixEllipse(ctx, x, y, erx, ery, rot, colorRgb, a);
   }
   if(g.thick){
     // highlight ridge to fake paint thickness (heavier for the palette knife),
@@ -350,6 +350,57 @@ function stampEraser(ctx,x,y,size,p,col,j,variant){
 function hexToRgba(hex,a){
   const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${a})`;
+}
+function hexToRgbArr(hex){
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+// Wet-in-wet pigment mixing for oil/painting strokes: instead of alpha-
+// compositing the new dab on top of whatever's already on this layer, each
+// pixel under the dab is read back, run through Mixbox against the incoming
+// pigment, and written back opaque -- the same read/blend/write-back pattern
+// stampSurface() already uses for the smudge tool. Where the layer is still
+// blank under the dab, there's nothing real to mix with, so that pixel just
+// gets the new color laid down at the normal stamp alpha instead.
+function wetMixEllipse(ctx, cx, cy, rx, ry, rot, colorRgb, alpha){
+  if(typeof mixbox === 'undefined'){
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgb('+colorRgb.join(',')+')';
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot);
+    ctx.beginPath(); ctx.ellipse(0,0,rx,ry,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const pad = 2;
+  const rr = Math.max(rx,ry);
+  const cw = ctx.canvas.width, ch = ctx.canvas.height;
+  const sx = Math.max(0, Math.floor(cx-rr-pad)), sy = Math.max(0, Math.floor(cy-rr-pad));
+  const ex = Math.min(cw, Math.ceil(cx+rr+pad)), ey = Math.min(ch, Math.ceil(cy+rr+pad));
+  const w = ex-sx, h = ey-sy;
+  if(w<=0 || h<=0) return;
+  const img = ctx.getImageData(sx, sy, w, h);
+  const d = img.data;
+  const cosR = Math.cos(-rot), sinR = Math.sin(-rot);
+  const edgeStart = 0.68;
+  for(let yy=0; yy<h; yy++){
+    for(let xx=0; xx<w; xx++){
+      const px = sx+xx - cx, py = sy+yy - cy;
+      const lx = px*cosR - py*sinR, ly = px*sinR + py*cosR;
+      const dist = Math.sqrt((lx/rx)*(lx/rx) + (ly/ry)*(ly/ry));
+      if(dist > 1) continue;
+      const falloff = dist<=edgeStart ? 1 : 1-((dist-edgeStart)/(1-edgeStart));
+      const t = alpha*falloff;
+      if(t<=0.004) continue;
+      const i = (yy*w+xx)*4;
+      if(d[i+3] < 12){
+        d[i]=colorRgb[0]; d[i+1]=colorRgb[1]; d[i+2]=colorRgb[2]; d[i+3]=Math.max(d[i+3], Math.round(t*255));
+        continue;
+      }
+      const mixed = mixbox.lerp([d[i],d[i+1],d[i+2]], colorRgb, t);
+      d[i]=mixed[0]; d[i+1]=mixed[1]; d[i+2]=mixed[2]; d[i+3]=255;
+    }
+  }
+  ctx.putImageData(img, sx, sy);
 }
 // Surface / Smooth Blend -- a real smudge: it samples the paint already on the
 // canvas at the previous point and drags a softened copy of it to the new
@@ -542,6 +593,28 @@ document.querySelectorAll('.tile[data-medium]').forEach(btn=>{
 });
 document.querySelector('.tile[data-medium="graphite"][data-variant="hb"]').classList.add('active');
 
+// ---------- Project mode (Paint / Drawing / Mixed Media) ----------
+// Filters the Brushes menu down to what's relevant for the kind of work
+// someone's doing, via each brush sub-category's data-cat attribute.
+// 'mixed' (the default) shows everything, same as before this existed.
+let projectMode = localStorage.getItem('vq-project-mode') || 'mixed';
+function applyProjectMode(){
+  document.querySelectorAll('.tile[data-mode]').forEach(b=>
+    b.classList.toggle('active', b.dataset.mode === projectMode));
+  document.querySelectorAll('details.menu-sub[data-cat]').forEach(sub=>{
+    const show = projectMode === 'mixed' || sub.dataset.cat === projectMode;
+    sub.style.display = show ? '' : 'none';
+  });
+}
+document.querySelectorAll('.tile[data-mode]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    projectMode = btn.dataset.mode;
+    localStorage.setItem('vq-project-mode', projectMode);
+    applyProjectMode();
+  });
+});
+applyProjectMode();
+
 const textureBox = document.getElementById('textureBox');
 const textureToggle = document.getElementById('textureToggle');
 // The seven working surfaces, picked from a dropdown rather than a swatch
@@ -561,6 +634,17 @@ const SURFACES = [
   {type:'glass', label:'Glass — Stained Glass Abstract'},
 ];
 const surfaceSel = document.getElementById('surfaceSel');
+const surfacePreview = document.getElementById('surfacePreview');
+function updateSurfacePreview(){
+  const photoUrl = SURFACE_PHOTOS[paperType];
+  if (photoUrl) {
+    surfacePreview.style.backgroundImage = `url('${photoUrl}')`;
+    surfacePreview.style.backgroundColor = 'transparent';
+  } else {
+    surfacePreview.style.backgroundImage = 'none';
+    surfacePreview.style.backgroundColor = paperBase(paperType);
+  }
+}
 SURFACES.forEach(t=>{
   const opt = document.createElement('option');
   opt.value = t.type;
@@ -568,8 +652,10 @@ SURFACES.forEach(t=>{
   if (t.type === paperType) opt.selected = true;
   surfaceSel.appendChild(opt);
 });
+updateSurfacePreview();
 surfaceSel.addEventListener('change', ()=>{
   paperType = surfaceSel.value;
+  updateSurfacePreview();
   drawPaper(pctx); drawAutoPaintImg(pctx);
 });
 textureToggle.addEventListener('click', ()=>{
@@ -594,6 +680,78 @@ PALETTE.forEach(c=>{
     document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); d.classList.add('active'); });
   swEl.appendChild(d);
 });
+
+// ---------- pigments (real paint names, Kubelka-Munk mixing via Mixbox) ----------
+// Mixbox (window.mixbox, loaded as /vendor/mixbox.js) models how actual pigments
+// absorb and scatter light, so e.g. a blue and a yellow mix toward green the way
+// real paint does, instead of the muddy flat average naive RGB blending gives.
+// These are Mixbox's 13 built-in real pigments -- its latent-space mixing is only
+// calibrated against these, so picking from this list (rather than an arbitrary
+// hex color) is what makes mixing between them behave like real paint.
+// Split into warm/cool by traditional color-wheel grouping (red/orange/yellow
+// warm; blue/green/violet cool); Sap Green and Burnt Sienna lean warm in a
+// traditional split palette, so they're grouped there despite being green/brown.
+function rgbToHex(rgb){ return '#'+rgb.map(c=>Math.max(0,Math.min(255,Math.round(c))).toString(16).padStart(2,'0')).join(''); }
+
+const WARM_PIGMENTS = [
+  { name: 'Cadmium Yellow',       rgb: [254,236,0] },
+  { name: 'Hansa Yellow',         rgb: [252,211,0] },
+  { name: 'Cadmium Orange',       rgb: [255,105,0] },
+  { name: 'Cadmium Red',          rgb: [255,39,2]  },
+  { name: 'Quinacridone Magenta', rgb: [128,2,46]  },
+  { name: 'Sap Green',            rgb: [107,148,4] },
+  { name: 'Burnt Sienna',         rgb: [123,72,0]  },
+];
+const COOL_PIGMENTS = [
+  { name: 'Cobalt Violet',    rgb: [78,0,66]   },
+  { name: 'Ultramarine Blue', rgb: [25,0,89]   },
+  { name: 'Cobalt Blue',      rgb: [0,33,133]  },
+  { name: 'Phthalo Blue',     rgb: [13,27,68]  },
+  { name: 'Phthalo Green',    rgb: [0,60,50]   },
+  { name: 'Permanent Green',  rgb: [7,109,22]  },
+];
+// Real pigment whites/blacks, for the grayscale slider -- mixed via Mixbox too,
+// so the slider's gray isn't a flat CSS fade but the way white and black paint
+// actually average (real blacks carry a slight warm or cool cast, not neutral).
+const TITANIUM_WHITE = [255,255,255];
+const MARS_BLACK = [20,17,15];
+
+function selectPigment(hex, btn){
+  color = hex; colorPicker.value = hex;
+  document.querySelectorAll('.pigment-swatch, .swatch').forEach(s=>s.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function buildPigmentRow(containerId, pigments){
+  const row = document.getElementById(containerId);
+  if (!row) return;
+  pigments.forEach(p=>{
+    const hex = rgbToHex(p.rgb);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pigment-swatch';
+    btn.style.background = hex;
+    btn.title = p.name;
+    btn.setAttribute('aria-label', p.name);
+    btn.addEventListener('click', ()=> selectPigment(hex, btn));
+    row.appendChild(btn);
+  });
+}
+buildPigmentRow('pigmentWarmRow', WARM_PIGMENTS);
+buildPigmentRow('pigmentCoolRow', COOL_PIGMENTS);
+
+const grayscaleSlider = document.getElementById('grayscaleSlider');
+if (grayscaleSlider) {
+  grayscaleSlider.addEventListener('input', ()=>{
+    const t = Number(grayscaleSlider.value) / 100;
+    const mixed = (typeof mixbox !== 'undefined')
+      ? mixbox.lerp(TITANIUM_WHITE, MARS_BLACK, t)
+      : TITANIUM_WHITE.map((c,i)=> Math.round(c*(1-t) + MARS_BLACK[i]*t));
+    const hex = rgbToHex(mixed);
+    color = hex; colorPicker.value = hex;
+    document.querySelectorAll('.pigment-swatch, .swatch').forEach(s=>s.classList.remove('active'));
+  });
+}
 
 document.querySelectorAll('.val-circle, .val-tile').forEach(btn=>{
   btn.addEventListener('click', ()=>{

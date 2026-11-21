@@ -28,6 +28,10 @@ export default function DrawPage() {
   header .logo{font-family:Georgia,"Times New Roman",serif;font-size:24px;letter-spacing:4px;}
   header .logo b{color:var(--gold);font-weight:400;}
   header .tag{font-size:13px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
+  header .auth-btn{margin-left:auto;background:transparent;border:1px solid var(--gold-dim,#b08a3e);
+    color:var(--gold,#f2b94e);font-size:12.5px;letter-spacing:1px;text-transform:uppercase;
+    padding:8px 16px;border-radius:7px;cursor:pointer;font-family:inherit;}
+  header .auth-btn:hover{background:rgba(242,185,78,.08);}
   .main{flex:1;display:flex;min-height:0;overflow:hidden;}
   aside{width:230px;flex:0 0 230px;background:var(--panel);overflow-y:auto;padding:14px;border-right:1px solid var(--line);}
   aside.right{border-right:none;border-left:1px solid var(--line);transition:width .15s,flex-basis .15s;}
@@ -37,6 +41,18 @@ export default function DrawPage() {
   h3.sec{font-size:15px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
   h3.sec:first-child{margin-top:0;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .pigment-row-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin:6px 0 3px;}
+  .pigment-row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px;}
+  .pigment-swatch{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);cursor:pointer;padding:0;}
+  .pigment-swatch.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(242,185,78,.35) inset;}
+  .gray-slider{-webkit-appearance:none;appearance:none;width:100%;height:24px;border-radius:4px;margin:2px 0 6px;
+    background:linear-gradient(to right, #fff, #000);}
+  .gray-slider::-webkit-slider-runnable-track{height:24px;background:transparent;border-radius:4px;}
+  .gray-slider::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:30px;border-radius:3px;
+    background:var(--gold);border:1px solid #140f06;margin-top:-3px;cursor:pointer;box-shadow:0 0 6px rgba(242,185,78,.7);}
+  .gray-slider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
+  .gray-slider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
   button.tile{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:10px 7px;
     font-size:14.5px;letter-spacing:.3px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
   button.tile:hover{border-color:var(--gold-dim);}
@@ -104,6 +120,9 @@ export default function DrawPage() {
   .edit-rail .tile{width:30px;height:30px;flex:0 0 30px;padding:0;font-size:15px;display:flex;align-items:center;justify-content:center;}
   .rail-div{width:1px;align-self:stretch;background:var(--line);margin:0 2px;}
   .texture-box{display:none;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);}
+  .surface-preview{width:100%;height:52px;border-radius:6px;margin-bottom:6px;
+    background-size:cover;background-position:center;background-color:#536878;
+    border:1px solid var(--line);}
   .texture-box.open{display:block;}
   .prompt-chips{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px;background:#15110b;border:1px solid var(--line);border-radius:4px;}
   .chip-label{font-size:13.5px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
@@ -162,6 +181,7 @@ export default function DrawPage() {
   </svg>
   <header>
     <div class="logo">VERIDIAN <b>Q</b></div>
+    <button type="button" class="auth-btn" id="authBtn" title="Coming soon">Sign Up / Log In</button>
   </header>
   <div class="main">
     <aside class="left">
@@ -174,12 +194,20 @@ export default function DrawPage() {
         <button class="icon-btn" id="textureToggle" title="Surface">▦</button>
       </div>
 
-      <div class="texture-box" id="textureBox"><select id="surfaceSel"></select></div>
+      <div class="texture-box" id="textureBox"><div class="surface-preview" id="surfacePreview"></div><select id="surfaceSel"></select></div>
 
       <div class="menu-panel" id="menuPanel">
+        <details class="menu-cat" open>
+          <summary>Project</summary>
+          <div class="grid3" id="projectModeGrid">
+            <button class="tile" data-mode="paint">Paint</button>
+            <button class="tile" data-mode="drawing">Drawing</button>
+            <button class="tile" data-mode="mixed">Mixed Media</button>
+          </div>
+        </details>
         <details class="menu-cat">
           <summary>Brushes</summary>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/charcoal.png')">Charcoal</summary>
             <div class="grid2">
               <button class="tile" data-medium="charcoal" data-variant="vine">Vine</button>
@@ -189,7 +217,7 @@ export default function DrawPage() {
               <button class="tile" data-medium="charcoal" data-variant="soft">Soft</button>
             </div>
           </details>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/pencil.png')">Pencil</summary>
             <div class="grid2">
               <button class="tile" data-medium="graphite" data-variant="hb">HB</button>
@@ -200,28 +228,28 @@ export default function DrawPage() {
               <button class="tile" data-medium="graphite" data-variant="8b">8B</button>
             </div>
           </details>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/ink.png')">Ink</summary>
             <div class="grid2">
               <button class="tile" data-medium="ink" data-variant="liner">Fine Liner</button>
               <button class="tile" data-medium="ink" data-variant="brush">Brush Pen</button>
             </div>
           </details>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/markers.png')">Markers</summary>
             <div class="grid2">
               <button class="tile" data-medium="marker" data-variant="alcohol">Alcohol</button>
               <button class="tile" data-medium="marker" data-variant="chisel">Chisel Tip</button>
             </div>
           </details>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="paint">
             <summary class="med-icon" style="background-image:url('/brush-swatches/pastel.png')">Pastel</summary>
             <div class="grid2">
               <button class="tile" data-medium="pastel" data-variant="soft">Soft Pastel</button>
               <button class="tile" data-medium="pastel" data-variant="pencil">Pastel Pencil</button>
             </div>
           </details>
-          <details class="menu-sub">
+          <details class="menu-sub" data-cat="paint">
             <summary class="med-icon" style="background-image:url('/brush-swatches/painting.png')">Painting</summary>
             <div class="grid2">
               <button class="tile" data-medium="oil" data-variant="allaprima">Alla Prima</button>
@@ -241,6 +269,16 @@ export default function DrawPage() {
               <button class="tile" data-medium="surface" data-variant="smooth">Smooth Blend</button>
             </div>
             <div class="hint" style="padding:0 2px 8px;">Drags and softens the paint that's already there -- it adds no new color, it blends what's under the brush.</div>
+          </details>
+          <details class="menu-sub" data-cat="paint">
+            <summary>Pigments</summary>
+            <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
+            <div class="pigment-row-label">Warm</div>
+            <div class="pigment-row" id="pigmentWarmRow"></div>
+            <div class="pigment-row-label">Cool</div>
+            <div class="pigment-row" id="pigmentCoolRow"></div>
+            <div class="pigment-row-label">Grayscale</div>
+            <input type="range" id="grayscaleSlider" class="gray-slider" min="0" max="100" value="50">
           </details>
         </details>
 
@@ -487,7 +525,8 @@ export default function DrawPage() {
     </div>
   </div>
 </div>` }} />
-      <Script src="/draw-engine.js?v=9" strategy="afterInteractive" />
+      <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
+      <Script src="/draw-engine.js?v=12" strategy="afterInteractive" />
     </>
   );
 }
