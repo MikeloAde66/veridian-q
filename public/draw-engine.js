@@ -499,7 +499,11 @@ function stampSurface(ctx, x, y, size, prevX, prevY, strength){
 function stampAt(ctx, stroke, pt, idx){
   if (stroke.medium === 'surface'){
     const prev = (idx>0) ? stroke.points[idx-1] : pt;
-    const strength = (stroke.variant==='smooth') ? 0.35 : 0.35;
+    // Smooth feathers in lightly per stamp (0.35) so repeated passes build
+    // up gradually. Hard drags nearly the whole sampled patch across in one
+    // pass (0.85) -- same smudge mechanic, far less softening, so edges
+    // carry across firm and solid instead of blurring out.
+    const strength = (stroke.variant==='hard') ? 0.85 : 0.35;
     stampSurface(ctx, pt.x, pt.y, stroke.size, prev.x, prev.y, strength*Math.max(0.3,pt.p));
     return;
   }

@@ -28,10 +28,15 @@ export default function DrawPage() {
   header .logo{font-family:Georgia,"Times New Roman",serif;font-size:24px;letter-spacing:4px;}
   header .logo b{color:var(--gold);font-weight:400;}
   header .tag{font-size:13px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
-  header .auth-btn{margin-left:auto;background:transparent;border:1px solid var(--gold-dim,#b08a3e);
-    color:var(--gold,#f2b94e);font-size:12.5px;letter-spacing:1px;text-transform:uppercase;
-    padding:8px 16px;border-radius:7px;cursor:pointer;font-family:inherit;}
+  header .auth-btn{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.6);
+    color:var(--gold,#f2b94e);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:8px 16px;border-radius:7px;cursor:pointer;font-family:inherit;
+    animation:authPump 3.6s ease-in-out infinite;}
   header .auth-btn:hover{background:rgba(242,185,78,.08);}
+  @keyframes authPump{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.045);}
+  }
   .main{flex:1;display:flex;min-height:0;overflow:hidden;}
   aside{width:230px;flex:0 0 230px;background:var(--panel);overflow-y:auto;padding:14px;border-right:1px solid var(--line);}
   aside.right{border-right:none;border-left:1px solid var(--line);transition:width .15s,flex-basis .15s;}
@@ -106,6 +111,23 @@ export default function DrawPage() {
   .ref-toolbar .btn{margin-top:0;}
   .ref-panel{display:none;align-items:center;gap:10px;flex-wrap:wrap;}
   .ref-panel.open{display:flex;}
+  /* Thin rounded white pill + gold shimmer, scoped to this toolbar only --
+     does not touch .btn or label.small anywhere else in the app. */
+  .ref-toolbar .btn,
+  .ref-toolbar label.small{
+    width:auto;margin:0;display:inline-flex;align-items:center;gap:4px;
+    border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 14px;
+    font-size:11px;letter-spacing:1px;
+    background-image:linear-gradient(90deg, var(--gold) 0%, #fff6d8 45%, var(--gold) 100%);
+    background-size:220% auto;background-repeat:no-repeat;
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    animation:refToolbarShine 5s linear infinite;
+  }
+  .ref-toolbar .btn:hover{background-color:transparent;}
+  @keyframes refToolbarShine{
+    0%{background-position:220% center;}
+    100%{background-position:-220% center;}
+  }
   #exportOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;
     flex-direction:column;z-index:50;padding:20px;}
   #exportOverlay img{max-width:90vw;max-height:70vh;border:1px solid var(--line);background:#fff;}
@@ -271,8 +293,9 @@ export default function DrawPage() {
             <summary>Surface</summary>
             <div class="grid2">
               <button class="tile" data-medium="surface" data-variant="smooth">Smooth Blend</button>
+              <button class="tile" data-medium="surface" data-variant="hard">Hard Blend</button>
             </div>
-            <div class="hint" style="padding:0 2px 8px;">Drags and softens the paint that's already there -- it adds no new color, it blends what's under the brush.</div>
+            <div class="hint" style="padding:0 2px 8px;">Both drag the paint that's already there -- neither adds new color. Smooth softens and feathers it as it drags; Hard carries it across with much less softening, for a firmer, more solid smear.</div>
           </details>
           <details class="menu-sub" data-cat="paint">
             <summary>Pigments</summary>
