@@ -31,11 +31,12 @@ export default function DrawPage() {
   header .auth-btn{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.6);
     color:var(--gold,#f2b94e);font-size:10px;letter-spacing:1px;text-transform:uppercase;
     padding:8px 16px;border-radius:7px;cursor:pointer;font-family:inherit;
-    animation:authPump 3.6s ease-in-out infinite;}
+    animation:authPump 1.1s ease-out 1 forwards;}
   header .auth-btn:hover{background:rgba(242,185,78,.08);}
   @keyframes authPump{
-    0%,100%{transform:scale(1);}
-    50%{transform:scale(1.045);}
+    0%{transform:scale(1);box-shadow:0 0 0 rgba(242,185,78,0);}
+    50%{transform:scale(1.06);}
+    100%{transform:scale(1);box-shadow:0 0 10px rgba(242,185,78,.45);border-color:rgba(242,185,78,.75);}
   }
   .main{flex:1;display:flex;min-height:0;overflow:hidden;}
   aside{width:230px;flex:0 0 230px;background:var(--panel);overflow-y:auto;padding:14px;border-right:1px solid var(--line);}
@@ -121,12 +122,12 @@ export default function DrawPage() {
     background-image:linear-gradient(90deg, var(--gold) 0%, #fff6d8 45%, var(--gold) 100%);
     background-size:220% auto;background-repeat:no-repeat;
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-    animation:refToolbarShine 5s linear infinite;
+    animation:refToolbarShine 1.2s ease-out 1 forwards;
   }
   .ref-toolbar .btn:hover{background-color:transparent;}
   @keyframes refToolbarShine{
     0%{background-position:220% center;}
-    100%{background-position:-220% center;}
+    100%{background-position:0% center;}
   }
   #exportOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;
     flex-direction:column;z-index:50;padding:20px;}
