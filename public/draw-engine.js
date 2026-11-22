@@ -919,7 +919,13 @@ document.getElementById('rightToggle').addEventListener('click', ()=>{
   applyZoom();
 });
 document.getElementById('undoBtn').addEventListener('click', ()=>{ strokes.pop(); redrawLiveStrokes(); });
-document.getElementById('clearBtn').addEventListener('click', ()=>{ strokes = strokes.filter(s=>s.layer!==activeLayerId); redrawLiveStrokes(); });
+// Was silently scoped to only the active layer (`strokes.filter(s=>s.layer!==activeLayerId)`)
+// with nothing in the UI saying "Clear" meant anything but "clear the canvas" --
+// Undo right next to it has always acted on every layer, so Clear did too,
+// inconsistently. Strokes on any other layer survived a click (and so came
+// right back after a refresh, since they were never actually gone -- autosave
+// was accurately persisting them). Matches Undo's scope now: everything.
+document.getElementById('clearBtn').addEventListener('click', ()=>{ strokes = []; redrawLiveStrokes(); });
 
 // ---------- Layers: what you paint on. Export always flattens all of them. ----------
 const layersList = document.getElementById('layersList');
