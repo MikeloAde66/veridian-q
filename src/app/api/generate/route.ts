@@ -79,6 +79,20 @@ export async function POST(req: Request) {
   // the same -- only the medium changes. Without this the model treats the
   // style words ("rendered as a charcoal sketch...") as license to redesign
   // the scene, not just reinterpret its rendering.
+  // Flux's default instinct is toward a clean, resolved, "finished render"
+  // look -- that's the opposite of how real paint/charcoal/pastel actually
+  // reads. Unevenness, unresolved passages and visible correction are what
+  // signal a human hand working in real time rather than a smoothed digital
+  // illustration, so this has to be stated as a goal, not just implied by
+  // "not airbrushed" -- otherwise the model quietly cleans it back up.
+  const messinessClause =
+    'do not over-resolve or clean up the image -- leave it a little unfinished and imperfect in places: ' +
+    'visible pentimento or correction marks where a line or shape was reworked, strokes that break, skip, ' +
+    'or vary in pressure rather than flowing evenly, edges that go soft, smudged, or lost in some areas and ' +
+    'stay sharp in others, uneven or patchy paint/pigment coverage rather than flat even fills -- ' +
+    'this deliberate unevenness is what makes it read as a real physical painting made by hand, not a ' +
+    'polished digital illustration, so do not smooth it away in pursuit of a tidier result';
+
   const finalPrompt = imageUrl
     ? [
         'Paint this subject in a real physical medium, as a genuine painting, not a filtered photo',
@@ -87,9 +101,10 @@ export async function POST(req: Request) {
         'keep the same subject, pose, framing and composition as the reference photo',
         'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
         'rough, scraggly, hand-made edges and texture, not photographic or airbrushed -- this should look and feel like paint, pastel, or charcoal on a surface, not a digital filter over a photo',
+        messinessClause,
         pigmentClause,
       ].filter(Boolean).join(', ')
-    : [styleModifier, userPrompt, pigmentClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
+    : [styleModifier, userPrompt, messinessClause, pigmentClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
   const model = dualConditioning
     ? MODELS.dualConditioned
