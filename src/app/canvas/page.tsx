@@ -267,8 +267,8 @@ export default function DrawPage() {
           <details class="menu-sub" data-cat="paint">
             <summary class="med-icon" style="background-image:url('/brush-swatches/painting.png')">Painting</summary>
             <div class="grid2">
-              <button class="tile" data-medium="oil" data-variant="allaprima">Alla Prima</button>
-              <button class="tile" data-medium="oil" data-variant="impasto">Impasto</button>
+              <button class="tile" data-medium="oil" data-variant="allaprima">Synthetic</button>
+              <button class="tile" data-medium="oil" data-variant="impasto">Custom</button>
               <button class="tile" data-medium="oil" data-variant="round">Round</button>
               <button class="tile" data-medium="oil" data-variant="flat">Flat</button>
               <button class="tile" data-medium="oil" data-variant="filbert">Filbert</button>
@@ -451,8 +451,8 @@ export default function DrawPage() {
         <option value="pastel">Soft Pastel Painting</option>
         <option value="watercolor">Watercolor</option>
         <option value="acrylic">Acrylic</option>
-        <option value="oil-allaprima">Oil — Alla Prima</option>
-        <option value="oil-impasto">Oil — Impasto</option>
+        <option value="oil-allaprima">Oil — Synthetic</option>
+        <option value="oil-impasto">Oil — Custom</option>
         <option value="monochromatic">Monochromatic</option>
       </select>
 
