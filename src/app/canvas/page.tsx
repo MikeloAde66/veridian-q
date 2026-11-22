@@ -22,7 +22,7 @@ export default function DrawPage() {
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;overflow:hidden;}
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;}
   #app{display:flex;flex-direction:column;height:100dvh;min-height:100dvh;}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   header .logo{font-family:Georgia,"Times New Roman",serif;font-size:24px;letter-spacing:4px;}
