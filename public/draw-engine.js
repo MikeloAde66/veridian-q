@@ -562,6 +562,7 @@ function drawReferenceImg(ctx){
 function redrawLiveStrokes(){
   ctx.clearRect(0,0,cv.width,cv.height);
   drawLayeredStrokes(ctx);
+  scheduleAutosave();
 }
 
 // ---------- pointer handling ----------
@@ -757,6 +758,7 @@ surfaceSel.addEventListener('change', ()=>{
   paperType = surfaceSel.value;
   updateSurfacePreview();
   drawPaper(pctx); drawAutoPaintImg(pctx);
+  scheduleAutosave();
 });
 textureToggle.addEventListener('click', ()=>{
   const open = textureBox.classList.toggle('open');
@@ -789,7 +791,7 @@ const colorPicker = document.getElementById('colorPicker');
 // generic hue. Cleared whenever the artist picks a raw hex/preset swatch
 // instead of a named Mixbox pigment below.
 let activePigmentName = null;
-colorPicker.addEventListener('input', ()=>{ color = colorPicker.value; activePigmentName = null; });
+colorPicker.addEventListener('input', ()=>{ color = colorPicker.value; activePigmentName = null; scheduleAutosave(); });
 const PALETTE = ['#8a3324','#d3d3d3','#c98910','#da70d6','#ffffff']; // Burnt Umber, Light Grey, Yellow Ochre, Orchid, White
 const swEl = document.getElementById('swatches');
 PALETTE.forEach(c=>{
@@ -839,6 +841,7 @@ function selectPigment(hex, btn){
   activePigmentName = btn ? btn.title : null;
   document.querySelectorAll('.pigment-swatch, .swatch').forEach(s=>s.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  scheduleAutosave();
 }
 
 function buildPigmentRow(containerId, pigments){
@@ -883,7 +886,7 @@ document.querySelectorAll('.val-circle, .val-tile').forEach(btn=>{
 
 const sizeSlider = document.getElementById('sizeSlider');
 const sizeVal = document.getElementById('sizeVal');
-sizeSlider.addEventListener('input', ()=>{ brushSize=Number(sizeSlider.value); sizeVal.textContent=brushSize; });
+sizeSlider.addEventListener('input', ()=>{ brushSize=Number(sizeSlider.value); sizeVal.textContent=brushSize; scheduleAutosave(); });
 
 document.getElementById('pressureMode').addEventListener('change', e=> pressureMode = e.target.value);
 
@@ -935,7 +938,7 @@ function renderLayersPanel(){
       });
       row.appendChild(delBtn);
     }
-    row.addEventListener('click', ()=>{ activeLayerId = L.id; renderLayersPanel(); });
+    row.addEventListener('click', ()=>{ activeLayerId = L.id; renderLayersPanel(); scheduleAutosave(); });
     layersList.appendChild(row);
 
     // Fade slider: a live preview of this layer's strength, independent of Mute.
@@ -980,6 +983,7 @@ addLayerBtn.addEventListener('click', ()=>{
   layers.push({id, name: `Layer ${layers.length+1}`, visible:true, opacity:1});
   activeLayerId = id;
   renderLayersPanel();
+  scheduleAutosave();
 });
 renderLayersPanel();
 
@@ -1106,15 +1110,16 @@ document.getElementById('importRefBtn').addEventListener('click', ()=> document.
 document.getElementById('refFileInput').addEventListener('change', e=>{
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = ev=>{ refImg.src = ev.target.result; refImg.style.display='block'; };
+  reader.onload = ev=>{ refImg.src = ev.target.result; refImg.style.display='block'; scheduleAutosave(); };
   reader.readAsDataURL(file);
 });
 document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   refImg.style.display='none'; refImg.src='';
   document.getElementById('traceChk').checked=false; paperCv.style.opacity=1;
+  scheduleAutosave();
 });
 const refOpacity = document.getElementById('refOpacity'), refOpVal = document.getElementById('refOpVal');
-refOpacity.addEventListener('input', ()=>{ refImg.style.opacity = refOpacity.value/100; refOpVal.textContent = refOpacity.value; });
+refOpacity.addEventListener('input', ()=>{ refImg.style.opacity = refOpacity.value/100; refOpVal.textContent = refOpacity.value; scheduleAutosave(); });
 document.getElementById('traceChk').addEventListener('change', e=>{ paperCv.style.opacity = e.target.checked ? 0.32 : 1; });
 
 // ---------- Auto Paint ----------
@@ -1522,6 +1527,69 @@ document.getElementById('adjResetBtn').addEventListener('click', ()=>{
   });
   stage.style.filter = '';
 });
+
+// ---------- Autosave: keeps your work in this browser across reloads ----------
+const AUTOSAVE_KEY = 'vq-autosave-v1';
+let autosaveTimer = null;
+function scheduleAutosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveProject, 600);
+}
+function saveProject(keepRefPhoto){
+  const data = {
+    v: 1,
+    strokes, layers, activeLayerId, nextLayerId,
+    paperType, medium, variant, color, brushSize,
+    activePigmentName,
+    canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
+    ref: (refImg && refImg.src && refImg.style.display !== 'none' && keepRefPhoto !== false)
+      ? { src: refImg.src, opacity: refImg.style.opacity }
+      : null,
+  };
+  try{
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+  }catch(e){
+    // Likely quota exceeded (a large reference photo pushed it over) --
+    // retry without the photo so the painting itself still gets saved.
+    try{
+      data.ref = null;
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+    }catch(e2){ /* give up quietly -- autosave is best-effort */ }
+  }
+}
+function restoreProject(){
+  let raw;
+  try{ raw = localStorage.getItem(AUTOSAVE_KEY); }catch(e){ return; }
+  if(!raw) return;
+  let data;
+  try{ data = JSON.parse(raw); }catch(e){ return; }
+  if(!data || !Array.isArray(data.strokes)) return;
+  strokes = data.strokes;
+  if(Array.isArray(data.layers) && data.layers.length) layers = data.layers;
+  if(data.activeLayerId != null) activeLayerId = data.activeLayerId;
+  nextLayerId = data.nextLayerId != null ? data.nextLayerId : (Math.max(0, ...layers.map(l=>l.id)) + 1);
+  if(data.paperType){ paperType = data.paperType; surfaceSel.value = paperType; updateSurfacePreview(); }
+  if(data.medium){ medium = data.medium; variant = data.variant; }
+  if(data.color){ color = data.color; colorPicker.value = color; }
+  if(data.brushSize){ brushSize = data.brushSize; sizeSlider.value = brushSize; sizeVal.textContent = brushSize; }
+  if(data.activePigmentName !== undefined) activePigmentName = data.activePigmentName;
+  if(data.canvasSize && canvasSizeSel){ canvasSizeSel.value = data.canvasSize; renderRuler(); }
+  if(data.ref && data.ref.src){
+    refImg.src = data.ref.src;
+    refImg.style.display = 'block';
+    refImg.style.opacity = data.ref.opacity || 0.5;
+    if(refOpacity){
+      refOpacity.value = Math.round((parseFloat(data.ref.opacity)||0.5)*100);
+      refOpVal.textContent = refOpacity.value;
+    }
+  }
+  renderLayersPanel();
+  redrawLiveStrokes();
+}
+restoreProject();
+window.addEventListener('beforeunload', ()=>saveProject());
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveProject(); });
+setInterval(()=>saveProject(), 8000);
 
 // ---------- boot ----------
 function bootPaint(){
