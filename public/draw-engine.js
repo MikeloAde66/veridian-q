@@ -1388,6 +1388,20 @@ autoPaintBtn.addEventListener('click', async ()=>{
       autoPaintImg = {img, dx, dy, dw, dh}; // keep it so exports (fullRedraw) can replay it
       drawPaper(pctx);
       drawAutoPaintImg(pctx);
+      // The reference photo is a separate, CSS-positioned <img> that sits
+      // visually ON TOP of this canvas (see drawReferenceImg's comment) --
+      // at a high Opacity it fully covers whatever just got painted
+      // underneath, even though the paint is genuinely there. Without this,
+      // the artist has no way to tell Auto Paint worked short of manually
+      // dragging Opacity down themselves. Fade it back so the result Auto
+      // Paint just produced is actually visible, while leaving a faint
+      // trace of the reference for anyone still using it to guide brushwork.
+      if (withPhoto && refOpacity && Number(refOpacity.value) > 15) {
+        refOpacity.value = 15;
+        refImg.style.opacity = 0.15;
+        refOpVal.textContent = '15';
+        scheduleAutosave();
+      }
       autoPaintHint.textContent = DEFAULT_AUTOPAINT_HINT;
       autoPaintBtn.disabled = false;
       autoPaintBtn.textContent = 'Auto Paint';
