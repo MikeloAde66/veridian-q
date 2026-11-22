@@ -112,23 +112,15 @@ export default function DrawPage() {
   .ref-toolbar .btn{margin-top:0;}
   .ref-panel{display:none;align-items:center;gap:10px;flex-wrap:wrap;}
   .ref-panel.open{display:flex;}
-  /* Thin rounded white pill + gold shimmer, scoped to this toolbar only --
-     does not touch .btn or label.small anywhere else in the app. */
+  /* Matches the PROJECT tile style (button.tile) so this toolbar reads as
+     part of the same system instead of a separate pill treatment. */
   .ref-toolbar .btn,
   .ref-toolbar label.small{
     width:auto;margin:0;display:inline-flex;align-items:center;gap:4px;
-    border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 14px;
-    font-size:11px;letter-spacing:1px;
-    background-image:linear-gradient(90deg, var(--gold) 0%, #fff6d8 45%, var(--gold) 100%);
-    background-size:220% auto;background-repeat:no-repeat;
-    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-    animation:refToolbarShine 1.2s ease-out 1 forwards;
+    background:#1c1712;border:1px solid var(--line);border-radius:3px;padding:10px 14px;
+    font-size:14.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--text);
   }
-  .ref-toolbar .btn:hover{background-color:transparent;}
-  @keyframes refToolbarShine{
-    0%{background-position:220% center;}
-    100%{background-position:0% center;}
-  }
+  .ref-toolbar .btn:hover{border-color:var(--gold-dim);background:#1c1712;}
   #exportOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;
     flex-direction:column;z-index:50;padding:20px;}
   #exportOverlay img{max-width:90vw;max-height:70vh;border:1px solid var(--line);background:#fff;}
