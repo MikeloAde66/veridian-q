@@ -1112,11 +1112,86 @@ document.getElementById('refFileInput').addEventListener('change', e=>{
   const reader = new FileReader();
   reader.onload = ev=>{ refImg.src = ev.target.result; refImg.style.display='block'; scheduleAutosave(); };
   reader.readAsDataURL(file);
+  analyzeReferencePalette(file);
 });
 document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   refImg.style.display='none'; refImg.src='';
   document.getElementById('traceChk').checked=false; paperCv.style.opacity=1;
   scheduleAutosave();
+  hidePaletteAnalysis();
+});
+
+// ---------- Reference palette analysis: separate vision call, never touches painting ----------
+const paletteLoading = document.getElementById('paletteLoading');
+const paletteAnalysis = document.getElementById('paletteAnalysis');
+const paletteTemp = document.getElementById('paletteTemp');
+const paletteSwatches = document.getElementById('paletteSwatches');
+const paletteSummary = document.getElementById('paletteSummary');
+const usePaletteBtn = document.getElementById('usePaletteBtn');
+let lastPaletteData = null;
+
+function hidePaletteAnalysis(){
+  paletteLoading.style.display = 'none';
+  paletteAnalysis.classList.remove('show');
+  lastPaletteData = null;
+}
+
+async function analyzeReferencePalette(file){
+  hidePaletteAnalysis();
+  paletteLoading.style.display = 'block';
+  try{
+    const form = new FormData();
+    form.append('file', file, file.name || 'reference.png');
+    const upRes = await fetch('/api/upload', { method:'POST', body: form });
+    const upData = await upRes.json();
+    if(!upRes.ok || !upData.url) throw new Error(upData.error || 'Upload failed.');
+
+    const anRes = await fetch('/api/analyze-palette', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imageUrl: upData.url }),
+    });
+    const data = await anRes.json();
+    if(!anRes.ok) throw new Error(data.error || 'Analysis failed.');
+
+    paletteLoading.style.display = 'none';
+    if(!data.colors || !data.colors.length){
+      paletteSummary.textContent = data.summary || 'Could not analyze this image.';
+      paletteTemp.textContent = '';
+      paletteSwatches.innerHTML = '';
+      paletteAnalysis.classList.add('show');
+      lastPaletteData = null;
+      return;
+    }
+    lastPaletteData = data;
+    paletteTemp.textContent = data.temperature || '';
+    paletteSummary.textContent = data.summary || '';
+    paletteSwatches.innerHTML = '';
+    data.colors.forEach(c=>{
+      const sw = document.createElement('div');
+      sw.className = 'palette-swatch';
+      sw.style.background = c.hex || '#888';
+      sw.title = `${c.name}${c.hex ? ' ('+c.hex+')' : ''}`;
+      paletteSwatches.appendChild(sw);
+    });
+    paletteAnalysis.classList.add('show');
+  }catch(err){
+    paletteLoading.style.display = 'none';
+    paletteSummary.textContent = 'Palette analysis unavailable: ' + (err && err.message ? err.message : 'unknown error');
+    paletteTemp.textContent = '';
+    paletteSwatches.innerHTML = '';
+    paletteAnalysis.classList.add('show');
+    lastPaletteData = null;
+  }
+}
+
+usePaletteBtn.addEventListener('click', ()=>{
+  if(!lastPaletteData || !lastPaletteData.colors || !lastPaletteData.colors.length) return;
+  const names = lastPaletteData.colors.map(c=>c.name).join(', ');
+  const tempWord = lastPaletteData.temperature ? lastPaletteData.temperature + ' ' : '';
+  const phrase = `${tempWord}palette -- ${names}`.trim();
+  const current = autoPaintPrompt.value.trim();
+  autoPaintPrompt.value = current ? `${current}, ${phrase}` : phrase;
 });
 const refOpacity = document.getElementById('refOpacity'), refOpVal = document.getElementById('refOpVal');
 refOpacity.addEventListener('input', ()=>{ refImg.style.opacity = refOpacity.value/100; refOpVal.textContent = refOpacity.value; scheduleAutosave(); });

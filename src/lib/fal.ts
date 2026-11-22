@@ -16,7 +16,14 @@ export const MODELS = {
   // while the canvas paint (not the photo) is the image actually being
   // restyled. See CONTROLNET_UNION_PRO below.
   dualConditioned: "fal-ai/flux-general/image-to-image",
+  // Vision-language model router, used only for analyzing an uploaded
+  // reference photo's color palette -- never for painting generation.
+  vision: "openrouter/router/vision",
 } as const;
+
+// Which underlying VLM the vision router calls. Picked for speed/cost; any
+// OpenRouter-listed vision model name works here if this one is swapped out.
+export const VISION_MODEL = "google/gemini-2.5-flash";
 
 // ControlNet used for the dual-conditioning path above. "canny" control mode
 // reads edges/structure from the reference photo without forcing its exact
