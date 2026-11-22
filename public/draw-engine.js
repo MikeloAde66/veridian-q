@@ -770,12 +770,17 @@ menuToggle.addEventListener('click', ()=>{
 });
 
 const colorPicker = document.getElementById('colorPicker');
-colorPicker.addEventListener('input', ()=> color = colorPicker.value);
+// The one real-pigment name currently selected (if any) -- sent to Auto
+// Paint so the model mixes toward an actual paint color instead of a
+// generic hue. Cleared whenever the artist picks a raw hex/preset swatch
+// instead of a named Mixbox pigment below.
+let activePigmentName = null;
+colorPicker.addEventListener('input', ()=>{ color = colorPicker.value; activePigmentName = null; });
 const PALETTE = ['#8a3324','#d3d3d3','#c98910','#da70d6','#ffffff']; // Burnt Umber, Light Grey, Yellow Ochre, Orchid, White
 const swEl = document.getElementById('swatches');
 PALETTE.forEach(c=>{
   const d=document.createElement('div'); d.className='swatch'; d.style.background=c;
-  d.addEventListener('click', ()=>{ color=c; colorPicker.value=c;
+  d.addEventListener('click', ()=>{ color=c; colorPicker.value=c; activePigmentName = null;
     document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); d.classList.add('active'); });
   swEl.appendChild(d);
 });
@@ -817,6 +822,7 @@ const MARS_BLACK = [20,17,15];
 
 function selectPigment(hex, btn){
   color = hex; colorPicker.value = hex;
+  activePigmentName = btn ? btn.title : null;
   document.querySelectorAll('.pigment-swatch, .swatch').forEach(s=>s.classList.remove('active'));
   if (btn) btn.classList.add('active');
 }
@@ -847,7 +853,7 @@ if (grayscaleSlider) {
       ? mixbox.lerp(TITANIUM_WHITE, MARS_BLACK, t)
       : TITANIUM_WHITE.map((c,i)=> Math.round(c*(1-t) + MARS_BLACK[i]*t));
     const hex = rgbToHex(mixed);
-    color = hex; colorPicker.value = hex;
+    color = hex; colorPicker.value = hex; activePigmentName = null;
     document.querySelectorAll('.pigment-swatch, .swatch').forEach(s=>s.classList.remove('active'));
   });
 }
@@ -855,7 +861,7 @@ if (grayscaleSlider) {
 document.querySelectorAll('.val-circle, .val-tile').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const c = btn.dataset.color;
-    color = c; colorPicker.value = c;
+    color = c; colorPicker.value = c; activePigmentName = null;
     document.querySelectorAll('.swatch,.val-circle').forEach(s=>s.classList.remove('active'));
     document.querySelectorAll(`.val-circle[data-color="${c}"]`).forEach(s=>s.classList.add('active'));
   });
@@ -1152,6 +1158,20 @@ function hasReferencePhoto(){
   return !!(refImg.src && refImg.style.display !== 'none');
 }
 
+// Snapshot of just the artist's own paint (paper + any prior Auto Paint
+// result + brush strokes) -- deliberately excludes the reference photo even
+// if "Include in export" is checked, since in dual conditioning the photo
+// travels separately as the ControlNet control image. Baking it in here too
+// would feed it to the model twice in two different roles.
+function captureCanvasPaintDataUrl(){
+  const off = document.createElement('canvas'); off.width = baseW; off.height = baseH;
+  const octx = off.getContext('2d', {willReadFrequently:true});
+  drawPaper(octx);
+  drawAutoPaintImg(octx);
+  drawLayeredStrokes(octx);
+  return off.toDataURL('image/png');
+}
+
 autoPaintBtn.addEventListener('click', async ()=>{
   const prompt = autoPaintPrompt.value.trim();
   const styleModifier = STYLE_PROMPTS[styleSel.value] || '';
@@ -1184,6 +1204,23 @@ autoPaintBtn.addEventListener('click', async ()=>{
       autoPaintHint.textContent = 'Repainting your reference photo\u2026';
     }
 
+    // Dual conditioning: only kicks in when there's BOTH a reference photo
+    // AND something actually painted on the canvas already -- a blank canvas
+    // has nothing worth preserving as the base image.
+    let canvasImageUrl;
+    const hasCanvasPaint = withPhoto && strokes.length > 0;
+    if (hasCanvasPaint) {
+      autoPaintHint.textContent = 'Uploading your canvas paint\u2026';
+      const canvasBlob = await (await fetch(captureCanvasPaintDataUrl())).blob();
+      const canvasForm = new FormData();
+      canvasForm.append('file', canvasBlob, 'canvas.png');
+      const canvasUpRes = await fetch('/api/upload', { method: 'POST', body: canvasForm });
+      const canvasUpData = await canvasUpRes.json();
+      if (!canvasUpRes.ok || !canvasUpData.url) throw new Error(canvasUpData.error || 'Canvas paint upload failed.');
+      canvasImageUrl = canvasUpData.url;
+      autoPaintHint.textContent = 'Repainting your canvas, guided by the reference\u2026';
+    }
+
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1191,6 +1228,9 @@ autoPaintBtn.addEventListener('click', async ()=>{
         prompt,
         styleModifier,
         imageUrl,
+        canvasImageUrl,
+        traceOpacity: Number(refOpacity.value),
+        pigments: activePigmentName ? [activePigmentName] : [],
       }),
     });
     const data = await res.json();

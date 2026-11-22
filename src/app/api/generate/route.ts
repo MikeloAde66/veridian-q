@@ -1,20 +1,29 @@
 import { NextResponse } from 'next/server';
-import { fal, MODELS } from '@/lib/fal';
+import { fal, MODELS, CONTROLNET_UNION_PRO } from '@/lib/fal';
 
 // Auto Paint backend -- wired the same way the proven "Activate Q" button
 // on the other Veridian Q site works: the official @fal-ai/client SDK
 // (fal.subscribe, which queues/polls reliably) against a real https image
 // URL, never a browser data: URL (the fal models can't fetch those).
-// - imageUrl present -> image-to-image, repaints the photo in the chosen style.
+// - imageUrl + canvasImageUrl both present -> dual conditioning: the artist's
+//   own canvas paint is the base image being restyled, the reference photo
+//   only steers structure/anatomy through a ControlNet (ControlNet-Union-Pro,
+//   canny mode) scaled by traceOpacity. Neither image is dropped.
+// - imageUrl only -> image-to-image, repaints the reference photo in the
+//   chosen style (unchanged from before).
 // - no imageUrl -> text-to-image, generates purely from the typed prompt + style.
 // Either prompt or imageUrl must be present -- the route refuses to run
-// blind with neither (no photo, no prompt = nothing to go on).
+// blind with neither (no photo, no prompt = nothing to go on). canvasImageUrl
+// alone (no reference photo) is ignored -- it only matters paired with one.
 
 type GenerateBody = {
   prompt?: string;
   styleModifier?: string;
   imageUrl?: string;
+  canvasImageUrl?: string; // the artist's own current paint layers, https url
   strength?: number; // 0-1, image-to-image only: how far to depart from the photo
+  traceOpacity?: number; // 0-100 from the Reference Opacity slider; dual-conditioning only
+  pigments?: string[]; // active pigment names (e.g. "Burnt Sienna"), mentioned in the prompt
 };
 
 export async function POST(req: Request) {
@@ -47,6 +56,11 @@ export async function POST(req: Request) {
   // middle ground: subject/composition still held in place by the prompt
   // below, but real room for paint texture, body and value shifts to show.
   const strength = typeof body.strength === 'number' ? body.strength : 0.45;
+  const canvasImageUrl = body.canvasImageUrl?.trim();
+  const pigments = Array.isArray(body.pigments) ? body.pigments.filter(Boolean) : [];
+  // Dual conditioning only makes sense paired with a reference photo -- canvas
+  // paint alone (no photo) just falls through to the existing single-image path.
+  const dualConditioning = Boolean(imageUrl) && Boolean(canvasImageUrl);
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -54,6 +68,12 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  // Mentioning the artist's chosen pigments steers color mixing toward paint
+  // names Mixbox actually models, instead of generic/arbitrary hues.
+  const pigmentClause = pigments.length
+    ? `Painted using a palette built around ${pigments.join(', ')}.`
+    : '';
 
   // When repainting a real photo, say explicitly that the subject must stay
   // the same -- only the medium changes. Without this the model treats the
@@ -67,15 +87,44 @@ export async function POST(req: Request) {
         'keep the same subject, pose, framing and composition as the reference photo',
         'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
         'rough, scraggly, hand-made edges and texture, not photographic or airbrushed -- this should look and feel like paint, pastel, or charcoal on a surface, not a digital filter over a photo',
+        pigmentClause,
       ].filter(Boolean).join(', ')
-    : [styleModifier, userPrompt].filter(Boolean).join(', ') || styleModifier || 'a painting';
+    : [styleModifier, userPrompt, pigmentClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
-  const model = imageUrl ? MODELS.imageToImage : MODELS.textToImage;
+  const model = dualConditioning
+    ? MODELS.dualConditioned
+    : imageUrl
+    ? MODELS.imageToImage
+    : MODELS.textToImage;
   const input: Record<string, unknown> = {
     prompt: finalPrompt,
     num_images: 1,
   };
-  if (imageUrl) {
+  if (dualConditioning) {
+    // The artist's own canvas paint is the base image actually being
+    // restyled (same role imageUrl plays in the single-image path below) --
+    // the reference photo never gets blended in directly, it only steers
+    // structure/anatomy through the ControlNet. Strength is pulled down a
+    // touch from the single-image default: canvas paint is already the
+    // artist's own composition, so it needs less forced departure than a
+    // straight photo does to read as "painted."
+    const dualStrength = Math.max(0.3, Number((strength - 0.1).toFixed(2)));
+    // traceOpacity (0-100, from the Reference Opacity slider) becomes the
+    // ControlNet's conditioning_scale: how strongly the photo's structure
+    // constrains the result. Capped at .55 -- full strength here fights the
+    // "paint it, don't trace it" instructions above.
+    const traceScale = Number((((body.traceOpacity ?? 50) / 100) * 0.55).toFixed(2));
+    input.image_url = canvasImageUrl;
+    input.strength = dualStrength;
+    input.controlnets = [
+      {
+        path: CONTROLNET_UNION_PRO,
+        control_image_url: imageUrl,
+        conditioning_scale: traceScale,
+        control_mode: 'canny',
+      },
+    ];
+  } else if (imageUrl) {
     // No image_size here: forcing 'square_hd' was stretching/cropping every
     // non-square reference photo into a square before the model even started,
     // which on its own would make the result look like a different photo.
