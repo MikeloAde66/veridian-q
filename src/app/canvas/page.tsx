@@ -478,10 +478,10 @@ export default function DrawPage() {
           <div>
             <div class="chip-label">Palette &amp; Mood</div>
             <div class="chip-row" data-chip-group="palette">
-              <button class="prompt-chip" type="button">warm palette</button>
-              <button class="prompt-chip" type="button">cool palette</button>
-              <button class="prompt-chip" type="button">muted earth tones</button>
-              <button class="prompt-chip" type="button">vivid saturated color</button>
+              <button class="prompt-chip" type="button" data-prompt="warm color palette -- cadmium yellow, cadmium orange, cadmium red, burnt sienna, and quinacridone magenta">warm palette</button>
+              <button class="prompt-chip" type="button" data-prompt="cool color palette -- ultramarine blue, cobalt blue, phthalo blue, phthalo green, and cobalt violet">cool palette</button>
+              <button class="prompt-chip" type="button" data-prompt="muted earth-tone palette -- burnt sienna, burnt umber, yellow ochre, and sage green, all desaturated and low-chroma">muted earth tones</button>
+              <button class="prompt-chip" type="button" data-prompt="vivid, highly saturated full-spectrum color -- no muting, no desaturation">vivid saturated color</button>
             </div>
           </div>
           <div>
