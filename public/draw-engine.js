@@ -1108,14 +1108,14 @@ document.getElementById('refDropdownBtn').addEventListener('click', ()=>{
 });
 document.getElementById('importRefBtn').addEventListener('click', ()=> document.getElementById('refFileInput').click());
 // Large phone-camera photos (often 5-15MB) exceed Vercel's serverless
-// request-body limit (~4.5MB) when uploaded as-is -- /api/upload and
-// /api/analyze-palette then get rejected by the platform before our route
-// code even runs, which shows up as no application logs at all and a
-// plain-text "Request Entity Too Large" body that breaks res.json(). A
-// reference image doesn't need its full camera resolution to be useful
-// for tracing or color analysis, so downscale it once on import and reuse
-// that single smaller copy everywhere (display, Auto Paint upload, palette
-// analysis, autosave) instead of the original file.
+// request-body limit (~4.5MB) when uploaded as-is -- /api/upload then
+// gets rejected by the platform before our route code even runs, which
+// shows up as no application logs at all and a plain-text "Request
+// Entity Too Large" body that breaks res.json(). A reference image
+// doesn't need its full camera resolution to be useful for tracing, so
+// downscale it once on import and reuse that single smaller copy
+// everywhere (display, Auto Paint upload, autosave) instead of the
+// original file.
 function resizeImageDataUrl(dataUrl, maxDim){
   return new Promise(resolve=>{
     const img = new Image();
@@ -1140,8 +1140,6 @@ document.getElementById('refFileInput').addEventListener('change', e=>{
   reader.onload = async ev=>{
     const resizedSrc = await resizeImageDataUrl(ev.target.result, 1600);
     refImg.src = resizedSrc; refImg.style.display='block'; scheduleAutosave();
-    const resizedBlob = await (await fetch(resizedSrc)).blob();
-    analyzeReferencePalette(resizedBlob);
   };
   reader.readAsDataURL(file);
 });
@@ -1149,23 +1147,7 @@ document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   refImg.style.display='none'; refImg.src='';
   document.getElementById('traceChk').checked=false; paperCv.style.opacity=1;
   scheduleAutosave();
-  hidePaletteAnalysis();
 });
-
-// ---------- Reference palette analysis: separate vision call, never touches painting ----------
-const paletteLoading = document.getElementById('paletteLoading');
-const paletteAnalysis = document.getElementById('paletteAnalysis');
-const paletteTemp = document.getElementById('paletteTemp');
-const paletteSwatches = document.getElementById('paletteSwatches');
-const paletteSummary = document.getElementById('paletteSummary');
-const usePaletteBtn = document.getElementById('usePaletteBtn');
-let lastPaletteData = null;
-
-function hidePaletteAnalysis(){
-  paletteLoading.style.display = 'none';
-  paletteAnalysis.classList.remove('show');
-  lastPaletteData = null;
-}
 
 // A platform-level rejection (body too large, gateway timeout, etc.) returns
 // plain text or HTML, not JSON -- calling res.json() directly on that throws
@@ -1180,63 +1162,6 @@ async function safeJson(res){
   }
 }
 
-async function analyzeReferencePalette(file){
-  hidePaletteAnalysis();
-  paletteLoading.style.display = 'block';
-  try{
-    const form = new FormData();
-    form.append('file', file, file.name || 'reference.png');
-    const upRes = await fetch('/api/upload', { method:'POST', body: form });
-    const upData = await safeJson(upRes);
-    if(!upRes.ok || !upData.url) throw new Error(upData.error || 'Upload failed.');
-
-    const anRes = await fetch('/api/analyze-palette', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ imageUrl: upData.url }),
-    });
-    const data = await safeJson(anRes);
-    if(!anRes.ok) throw new Error(data.error || 'Analysis failed.');
-
-    paletteLoading.style.display = 'none';
-    if(!data.colors || !data.colors.length){
-      paletteSummary.textContent = data.summary || 'Could not analyze this image.';
-      paletteTemp.textContent = '';
-      paletteSwatches.innerHTML = '';
-      paletteAnalysis.classList.add('show');
-      lastPaletteData = null;
-      return;
-    }
-    lastPaletteData = data;
-    paletteTemp.textContent = data.temperature || '';
-    paletteSummary.textContent = data.summary || '';
-    paletteSwatches.innerHTML = '';
-    data.colors.forEach(c=>{
-      const sw = document.createElement('div');
-      sw.className = 'palette-swatch';
-      sw.style.background = c.hex || '#888';
-      sw.title = `${c.name}${c.hex ? ' ('+c.hex+')' : ''}`;
-      paletteSwatches.appendChild(sw);
-    });
-    paletteAnalysis.classList.add('show');
-  }catch(err){
-    paletteLoading.style.display = 'none';
-    paletteSummary.textContent = 'Palette analysis unavailable: ' + (err && err.message ? err.message : 'unknown error');
-    paletteTemp.textContent = '';
-    paletteSwatches.innerHTML = '';
-    paletteAnalysis.classList.add('show');
-    lastPaletteData = null;
-  }
-}
-
-usePaletteBtn.addEventListener('click', ()=>{
-  if(!lastPaletteData || !lastPaletteData.colors || !lastPaletteData.colors.length) return;
-  const names = lastPaletteData.colors.map(c=>c.name).join(', ');
-  const tempWord = lastPaletteData.temperature ? lastPaletteData.temperature + ' ' : '';
-  const phrase = `${tempWord}palette -- ${names}`.trim();
-  const current = autoPaintPrompt.value.trim();
-  autoPaintPrompt.value = current ? `${current}, ${phrase}` : phrase;
-});
 const refOpacity = document.getElementById('refOpacity'), refOpVal = document.getElementById('refOpVal');
 refOpacity.addEventListener('input', ()=>{ refImg.style.opacity = refOpacity.value/100; refOpVal.textContent = refOpacity.value; scheduleAutosave(); });
 document.getElementById('traceChk').addEventListener('change', e=>{ paperCv.style.opacity = e.target.checked ? 0.32 : 1; });
