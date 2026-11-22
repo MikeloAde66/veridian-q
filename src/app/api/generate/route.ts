@@ -162,9 +162,17 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, imageUrl: outUrl, finalPrompt });
   } catch (err) {
-    console.error('generate failed', err);
+    // fal's ApiError puts the real validation detail in `.body` (422s), which
+    // console.error alone truncates to "[Object]" in Vercel's log viewer --
+    // stringify it explicitly so the actual rejected field/reason is visible.
+    const falBody = (err as { body?: unknown })?.body;
+    console.error('generate failed', err instanceof Error ? err.message : err, 'promptLength:', finalPrompt.length, 'body:', JSON.stringify(falBody));
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        detail: falBody,
+      },
       { status: 500 }
     );
   }
