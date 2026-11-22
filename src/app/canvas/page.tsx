@@ -390,7 +390,7 @@ export default function DrawPage() {
     <div class="canvas-area">
       <div class="ref-toolbar">
         <button class="btn" id="refDropdownBtn" style="width:auto;">Reference ▾</button>
-        <div id="refPanel" class="ref-panel">
+        <div id="refPanel" class="ref-panel open">
           <input type="file" id="refFileInput" accept="image/*" style="display:none;">
           <button class="btn" id="importRefBtn" style="width:auto;">Import</button>
           <button class="btn" id="clearRefBtn" style="width:auto;">Clear</button>
