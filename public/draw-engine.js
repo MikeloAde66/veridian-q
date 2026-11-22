@@ -688,6 +688,7 @@ document.querySelectorAll('.tile[data-medium]').forEach(btn=>{
     btn.classList.add('active');
     medium = btn.dataset.medium; variant = btn.dataset.variant;
     if(activeTool!=='draw') setTool(activeTool);
+    openColorBox();
   });
 });
 document.querySelector('.tile[data-medium="graphite"][data-variant="hb"]').classList.add('active');
@@ -761,6 +762,19 @@ textureToggle.addEventListener('click', ()=>{
   const open = textureBox.classList.toggle('open');
   textureToggle.classList.toggle('active', open);
 });
+const colorToggle = document.getElementById('colorToggle');
+const colorBox = document.getElementById('colorBox');
+colorToggle.classList.toggle('active', colorBox.classList.contains('open'));
+colorToggle.addEventListener('click', ()=>{
+  const open = colorBox.classList.toggle('open');
+  colorToggle.classList.toggle('active', open);
+});
+function openColorBox(){
+  if(!colorBox.classList.contains('open')){
+    colorBox.classList.add('open');
+    colorToggle.classList.add('active');
+  }
+}
 const menuToggle = document.getElementById('menuToggle');
 const menuPanel = document.getElementById('menuPanel');
 menuToggle.addEventListener('click', ()=>{

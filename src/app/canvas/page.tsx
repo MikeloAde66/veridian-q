@@ -139,6 +139,9 @@ export default function DrawPage() {
     background-size:cover;background-position:center;background-color:#536878;
     border:1px solid var(--line);}
   .texture-box.open{display:block;}
+  .color-box{display:none;padding:10px 2px 14px;margin-bottom:10px;border-bottom:1px solid var(--line);}
+  .color-box.open{display:block;}
+  .color-box h3.sec{margin-top:0;}
   .prompt-chips{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px;background:#15110b;border:1px solid var(--line);border-radius:4px;}
   .chip-label{font-size:12px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
   .chip-row{display:flex;flex-wrap:wrap;gap:5px;}
@@ -206,7 +209,17 @@ export default function DrawPage() {
         <button class="icon-btn tool-icon" id="toolCrop" title="Crop (drag a region, then Download/Copy it)">⬚</button>
         <button class="icon-btn tile" data-medium="eraser" data-variant="soft" title="Eraser">⌫</button>
         <span class="rail-div"></span>
+        <button class="icon-btn" id="colorToggle" title="Color & Brush Size">🎨</button>
         <button class="icon-btn" id="textureToggle" title="Surface">▦</button>
+      </div>
+
+      <div class="color-box open" id="colorBox">
+        <h3 class="sec">Color</h3>
+        <input type="color" id="colorPicker" value="#1a1a1a">
+        <div class="swatches" id="swatches"></div>
+        <h3 class="sec">Brush Size</h3>
+        <label class="small">Size — <span id="sizeVal">14</span>px</label>
+        <input type="range" id="sizeSlider" min="2" max="80" value="14">
       </div>
 
       <div class="texture-box" id="textureBox"><div class="surface-preview" id="surfacePreview"></div><select id="surfaceSel"></select></div>
@@ -220,7 +233,7 @@ export default function DrawPage() {
             <button class="tile" data-mode="mixed">Mixed Media</button>
           </div>
         </details>
-        <details class="menu-cat" open>
+        <details class="menu-cat">
           <summary>Brushes</summary>
           <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/charcoal.png')">Charcoal</summary>
@@ -290,7 +303,7 @@ export default function DrawPage() {
             </div>
             <div class="hint" style="padding:0 2px 8px;">Both drag the paint that's already there -- neither adds new color. Smooth softens and feathers it as it drags; Hard carries it across with much less softening, for a firmer, more solid smear.</div>
           </details>
-          <details class="menu-sub" data-cat="paint" open>
+          <details class="menu-sub" data-cat="paint">
             <summary>Pigments</summary>
             <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
             <div class="pigment-row-label">Warm</div>
@@ -423,13 +436,6 @@ export default function DrawPage() {
     <aside class="right collapsed" id="rightAside">
       <button class="btn" id="rightToggle">Settings ▾</button>
       <div id="rightBody">
-      <h3 class="sec">Color</h3>
-      <input type="color" id="colorPicker" value="#1a1a1a">
-      <div class="swatches" id="swatches"></div>
-
-      <h3 class="sec">Brush</h3>
-      <label class="small">Size — <span id="sizeVal">14</span>px</label>
-      <input type="range" id="sizeSlider" min="2" max="80" value="14">
       <label class="small">Pressure Sensitivity</label>
       <select id="pressureMode">
         <option value="auto">Auto (pen pressure, else speed)</option>
