@@ -55,9 +55,17 @@ export async function POST(req: Request) {
   // enough departure that the medium is unmistakable. 0.45 is the new
   // middle ground: subject/composition still held in place by the prompt
   // below, but real room for paint texture, body and value shifts to show.
-  const strength = typeof body.strength === 'number' ? body.strength : 0.45;
-  const canvasImageUrl = body.canvasImageUrl?.trim();
+  // Named pigments need room to actually override the photo's own colors --
+  // at the flat 0.45 default the model kept so much of the original pixels
+  // that a vivid, fully-saturated pigment list still came out as a thin
+  // tint over the reference's own (often pale/muted) palette. Bumping to
+  // 0.55 specifically when pigments are present gives the color-override
+  // instruction above enough departure to actually win.
   const pigments = Array.isArray(body.pigments) ? body.pigments.filter(Boolean) : [];
+  const strength = typeof body.strength === 'number'
+    ? body.strength
+    : pigments.length > 0 ? 0.55 : 0.45;
+  const canvasImageUrl = body.canvasImageUrl?.trim();
   // Dual conditioning only makes sense paired with a reference photo -- canvas
   // paint alone (no photo) just falls through to the existing single-image path.
   const dualConditioning = Boolean(imageUrl) && Boolean(canvasImageUrl);
@@ -70,9 +78,16 @@ export async function POST(req: Request) {
   }
 
   // Mentioning the artist's chosen pigments steers color mixing toward paint
-  // names Mixbox actually models, instead of generic/arbitrary hues.
+  // names Mixbox actually models, instead of generic/arbitrary hues. The
+  // original phrasing here ("Painted using a palette built around X, Y, Z")
+  // was too weak against a real photo: at a moderate image-to-image strength
+  // the model leans on the photo's OWN colors (often pale/washed-out) far
+  // more than a soft, trailing mention of pigment names, so results came out
+  // muted instead of vivid. This needs to read as an explicit override, not
+  // a suggestion -- and it's placed early in finalPrompt below (not appended
+  // last) since FLUX weighs earlier instructions more heavily.
   const pigmentClause = pigments.length
-    ? `Painted using a palette built around ${pigments.join(', ')}.`
+    ? `Use these exact pigments as the dominant colors throughout, rendered vivid and fully saturated -- not muted, pale, or washed-out: ${pigments.join(', ')}. These rich, intense paint colors should replace the reference photo's own colors wherever they conflict.`
     : '';
 
   // When repainting a real photo, say explicitly that the subject must stay
@@ -98,13 +113,13 @@ export async function POST(req: Request) {
         'Paint this subject in a real physical medium, as a genuine painting, not a filtered photo',
         styleModifier,
         userPrompt,
+        pigmentClause,
         'keep the same subject, pose, framing and composition as the reference photo',
         'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
         'rough, scraggly, hand-made edges and texture, not photographic or airbrushed -- this should look and feel like paint, pastel, or charcoal on a surface, not a digital filter over a photo',
         messinessClause,
-        pigmentClause,
       ].filter(Boolean).join(', ')
-    : [styleModifier, userPrompt, messinessClause, pigmentClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
+    : [styleModifier, userPrompt, pigmentClause, messinessClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
   const model = dualConditioning
     ? MODELS.dualConditioned
