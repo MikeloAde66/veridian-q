@@ -1107,12 +1107,43 @@ document.getElementById('refDropdownBtn').addEventListener('click', ()=>{
   document.getElementById('refPanel').classList.toggle('open');
 });
 document.getElementById('importRefBtn').addEventListener('click', ()=> document.getElementById('refFileInput').click());
+// Large phone-camera photos (often 5-15MB) exceed Vercel's serverless
+// request-body limit (~4.5MB) when uploaded as-is -- /api/upload and
+// /api/analyze-palette then get rejected by the platform before our route
+// code even runs, which shows up as no application logs at all and a
+// plain-text "Request Entity Too Large" body that breaks res.json(). A
+// reference image doesn't need its full camera resolution to be useful
+// for tracing or color analysis, so downscale it once on import and reuse
+// that single smaller copy everywhere (display, Auto Paint upload, palette
+// analysis, autosave) instead of the original file.
+function resizeImageDataUrl(dataUrl, maxDim){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=>{
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim){ resolve(dataUrl); return; }
+      const scale = maxDim / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+      const off = document.createElement('canvas');
+      off.width = width; off.height = height;
+      off.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(off.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = ()=> resolve(dataUrl); // fall back to the original rather than block import
+    img.src = dataUrl;
+  });
+}
 document.getElementById('refFileInput').addEventListener('change', e=>{
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = ev=>{ refImg.src = ev.target.result; refImg.style.display='block'; scheduleAutosave(); };
+  reader.onload = async ev=>{
+    const resizedSrc = await resizeImageDataUrl(ev.target.result, 1600);
+    refImg.src = resizedSrc; refImg.style.display='block'; scheduleAutosave();
+    const resizedBlob = await (await fetch(resizedSrc)).blob();
+    analyzeReferencePalette(resizedBlob);
+  };
   reader.readAsDataURL(file);
-  analyzeReferencePalette(file);
 });
 document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   refImg.style.display='none'; refImg.src='';
@@ -1136,6 +1167,19 @@ function hidePaletteAnalysis(){
   lastPaletteData = null;
 }
 
+// A platform-level rejection (body too large, gateway timeout, etc.) returns
+// plain text or HTML, not JSON -- calling res.json() directly on that throws
+// a cryptic "Unexpected token" instead of the actual problem. Read as text
+// first and only parse if it looks like JSON, so failures stay readable.
+async function safeJson(res){
+  const text = await res.text();
+  try{ return JSON.parse(text); }
+  catch{
+    const snippet = text.trim().slice(0, 120) || `HTTP ${res.status}`;
+    return { ok: false, error: snippet };
+  }
+}
+
 async function analyzeReferencePalette(file){
   hidePaletteAnalysis();
   paletteLoading.style.display = 'block';
@@ -1143,7 +1187,7 @@ async function analyzeReferencePalette(file){
     const form = new FormData();
     form.append('file', file, file.name || 'reference.png');
     const upRes = await fetch('/api/upload', { method:'POST', body: form });
-    const upData = await upRes.json();
+    const upData = await safeJson(upRes);
     if(!upRes.ok || !upData.url) throw new Error(upData.error || 'Upload failed.');
 
     const anRes = await fetch('/api/analyze-palette', {
@@ -1151,7 +1195,7 @@ async function analyzeReferencePalette(file){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ imageUrl: upData.url }),
     });
-    const data = await anRes.json();
+    const data = await safeJson(anRes);
     if(!anRes.ok) throw new Error(data.error || 'Analysis failed.');
 
     paletteLoading.style.display = 'none';
@@ -1292,7 +1336,7 @@ autoPaintBtn.addEventListener('click', async ()=>{
       const form = new FormData();
       form.append('file', photoBlob, 'reference.png');
       const upRes = await fetch('/api/upload', { method: 'POST', body: form });
-      const upData = await upRes.json();
+      const upData = await safeJson(upRes);
       if (!upRes.ok || !upData.url) throw new Error(upData.error || 'Reference photo upload failed.');
       imageUrl = upData.url;
       autoPaintHint.textContent = 'Repainting your reference photo\u2026';
@@ -1309,7 +1353,7 @@ autoPaintBtn.addEventListener('click', async ()=>{
       const canvasForm = new FormData();
       canvasForm.append('file', canvasBlob, 'canvas.png');
       const canvasUpRes = await fetch('/api/upload', { method: 'POST', body: canvasForm });
-      const canvasUpData = await canvasUpRes.json();
+      const canvasUpData = await safeJson(canvasUpRes);
       if (!canvasUpRes.ok || !canvasUpData.url) throw new Error(canvasUpData.error || 'Canvas paint upload failed.');
       canvasImageUrl = canvasUpData.url;
       autoPaintHint.textContent = 'Repainting your canvas, guided by the reference\u2026';
@@ -1327,9 +1371,9 @@ autoPaintBtn.addEventListener('click', async ()=>{
         pigments: activePigmentName ? [activePigmentName] : [],
       }),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!data.ok) {
-      throw new Error(data.error || `Request failed (${data.status || res.status})`);
+      throw new Error(data.error || `Request failed (${res.status})`);
     }
 
     const img = new Image();

@@ -133,16 +133,21 @@ export async function POST(req: Request) {
     input.strength = dualStrength;
     // Union-Pro is a *union* ControlNet -- fal's flux-general endpoint only
     // wires up `control_mode` correctly when it's passed via the separate
-    // `controlnet_unions` array. Putting a union model in the plain
-    // `controlnets` array (singular-mode ControlNets) left the pipeline's
-    // internal controlnet_mode tensor unset, which fal rejected as a 422:
-    // "controlnet_mode cannot be None when applying ControlNet-Union".
+    // `controlnet_unions` array, AND the control image/mode/scale are nested
+    // one level deeper under that item's own `controls` array (confirmed via
+    // fal's schema: ControlNetUnion = { path, controls: ControlNetUnionInput[] },
+    // not flat fields on the ControlNetUnion item itself). The flat-fields
+    // version was rejected with "controls: Field required".
     input.controlnet_unions = [
       {
         path: CONTROLNET_UNION_PRO,
-        control_image_url: imageUrl,
-        conditioning_scale: traceScale,
-        control_mode: 'canny',
+        controls: [
+          {
+            control_image_url: imageUrl,
+            conditioning_scale: traceScale,
+            control_mode: 'canny',
+          },
+        ],
       },
     ];
   } else if (imageUrl) {
