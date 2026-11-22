@@ -201,7 +201,7 @@ export default function DrawPage() {
   <div class="main">
     <aside class="left">
       <div class="edit-rail">
-        <button class="icon-btn" id="menuToggle" title="Menu" aria-expanded="false">☰</button>
+        <button class="icon-btn active" id="menuToggle" title="Menu" aria-expanded="true">☰</button>
         <button class="icon-btn tool-icon" id="toolMove" title="Move / Pan Canvas">✋</button>
         <button class="icon-btn tool-icon" id="toolCrop" title="Crop (drag a region, then Download/Copy it)">⬚</button>
         <button class="icon-btn tile" data-medium="eraser" data-variant="soft" title="Eraser">⌫</button>
@@ -211,7 +211,7 @@ export default function DrawPage() {
 
       <div class="texture-box" id="textureBox"><div class="surface-preview" id="surfacePreview"></div><select id="surfaceSel"></select></div>
 
-      <div class="menu-panel" id="menuPanel">
+      <div class="menu-panel open" id="menuPanel">
         <details class="menu-cat" open>
           <summary>Project</summary>
           <div class="grid3" id="projectModeGrid">
@@ -220,7 +220,7 @@ export default function DrawPage() {
             <button class="tile" data-mode="mixed">Mixed Media</button>
           </div>
         </details>
-        <details class="menu-cat">
+        <details class="menu-cat" open>
           <summary>Brushes</summary>
           <details class="menu-sub" data-cat="drawing">
             <summary class="med-icon" style="background-image:url('/brush-swatches/charcoal.png')">Charcoal</summary>
@@ -290,7 +290,7 @@ export default function DrawPage() {
             </div>
             <div class="hint" style="padding:0 2px 8px;">Both drag the paint that's already there -- neither adds new color. Smooth softens and feathers it as it drags; Hard carries it across with much less softening, for a firmer, more solid smear.</div>
           </details>
-          <details class="menu-sub" data-cat="paint">
+          <details class="menu-sub" data-cat="paint" open>
             <summary>Pigments</summary>
             <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
             <div class="pigment-row-label">Warm</div>
