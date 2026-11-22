@@ -50,21 +50,22 @@ export async function POST(req: Request) {
   // glossy look. 0.22 kept the source pixels almost untouched -- which
   // fixed the smoothing, but then the chosen medium (impasto, monochromatic,
   // etc.) barely showed up: it looked too close to the original photo to
-  // read as a *painting preview*. The point of Auto Paint is a preview of
-  // how the medium would look, not a pixel-for-pixel match -- so this needs
-  // enough departure that the medium is unmistakable. 0.45 is the new
-  // middle ground: subject/composition still held in place by the prompt
-  // below, but real room for paint texture, body and value shifts to show.
-  // Named pigments need room to actually override the photo's own colors --
-  // at the flat 0.45 default the model kept so much of the original pixels
-  // that a vivid, fully-saturated pigment list still came out as a thin
-  // tint over the reference's own (often pale/muted) palette. Bumping to
-  // 0.55 specifically when pigments are present gives the color-override
-  // instruction above enough departure to actually win.
+  // read as a *painting preview*. 0.45 was the next middle ground, but every
+  // reported "muted/washed-out" result traced back to real photos that were
+  // themselves pale/hazy (overcast landscapes, soft portraits) -- at 0.45 the
+  // model still keeps well over half the source image's own desaturated
+  // pixel values, and no amount of prompt wording fully out-votes that much
+  // surviving source color. The earlier fix (bumping to 0.55) was gated on
+  // `pigments`, which is ONLY set when the artist clicks a named-pigment
+  // color swatch first -- typing pigment names directly into the free-text
+  // prompt (the actual way every muted-result report was produced) never
+  // touched that gate at all. Raising the baseline itself, unconditionally,
+  // so any photo-based Auto Paint gets real room for vivid color regardless
+  // of how the prompt was written.
   const pigments = Array.isArray(body.pigments) ? body.pigments.filter(Boolean) : [];
   const strength = typeof body.strength === 'number'
     ? body.strength
-    : pigments.length > 0 ? 0.55 : 0.45;
+    : pigments.length > 0 ? 0.68 : 0.6;
   const canvasImageUrl = body.canvasImageUrl?.trim();
   // Dual conditioning only makes sense paired with a reference photo -- canvas
   // paint alone (no photo) just falls through to the existing single-image path.
@@ -90,6 +91,18 @@ export async function POST(req: Request) {
     ? `Use these exact pigments as the dominant colors throughout, rendered vivid and fully saturated -- not muted, pale, or washed-out: ${pigments.join(', ')}. These rich, intense paint colors should replace the reference photo's own colors wherever they conflict.`
     : '';
 
+  // The photo itself is frequently pale, overcast, or desaturated -- plain
+  // text-to-image Auto Paint (no photo) never has this problem because
+  // there's no source pixels to anchor to, but image-to-image inherits the
+  // photo's own color mood by default no matter what the prompt says to do.
+  // This needs to run unconditionally on every photo-based Auto Paint, not
+  // only when the artist happened to pick a named pigment swatch first
+  // (pigmentClause above) -- most results came from typed prompts or no
+  // color instruction at all, so vividness can't depend on that gate.
+  const vividnessClause = imageUrl
+    ? 'render the final painting in bold, rich, fully saturated color throughout -- do not mute, dull, desaturate, or wash the colors out to match the photo\'s own tones, even where the photo itself is pale, hazy, overcast, or low-contrast; the paint medium should look vivid and alive regardless of the source lighting'
+    : '';
+
   // When repainting a real photo, say explicitly that the subject must stay
   // the same -- only the medium changes. Without this the model treats the
   // style words ("rendered as a charcoal sketch...") as license to redesign
@@ -113,6 +126,7 @@ export async function POST(req: Request) {
         'Paint this subject in a real physical medium, as a genuine painting, not a filtered photo',
         styleModifier,
         userPrompt,
+        vividnessClause,
         pigmentClause,
         'keep the same subject, pose, framing and composition as the reference photo',
         'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
