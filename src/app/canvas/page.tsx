@@ -27,7 +27,7 @@ export default function DrawPage() {
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
   header .logo{font-family:Georgia,"Times New Roman",serif;font-size:24px;letter-spacing:4px;}
   header .logo b{color:var(--gold);font-weight:400;}
-  header .tag{font-size:13px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
+  header .tag{font-size:12px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
   header .auth-btn{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.6);
     color:var(--gold,#f2b94e);font-size:10px;letter-spacing:1px;text-transform:uppercase;
     padding:8px 16px;border-radius:7px;cursor:pointer;font-family:inherit;
@@ -44,7 +44,7 @@ export default function DrawPage() {
   aside.right.collapsed{width:60px;flex:0 0 60px;padding:14px 8px;overflow:hidden;}
   aside.right.collapsed #rightBody{display:none;}
   #rightToggle{margin-bottom:10px;}
-  h3.sec{font-size:15px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
+  h3.sec{font-size:12px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
   h3.sec:first-child{margin-top:0;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
@@ -60,10 +60,10 @@ export default function DrawPage() {
   .gray-slider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
   .gray-slider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
   button.tile{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:10px 7px;
-    font-size:15px;letter-spacing:.3px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
+    font-size:12px;letter-spacing:.3px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
   button.tile:hover{border-color:var(--gold-dim);}
   button.tile.active{border-color:var(--gold);color:var(--gold);background:#231c10;}
-  label.small{display:block;font-size:15px;color:var(--text-dim);letter-spacing:.5px;margin:10px 0 4px;text-transform:uppercase;}
+  label.small{display:block;font-size:12px;color:var(--text-dim);letter-spacing:.5px;margin:10px 0 4px;text-transform:uppercase;}
   input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:#2a2520;border-radius:2px;outline:none;}
   input[type=range]::-webkit-slider-runnable-track{height:4px;background:#2a2520;border-radius:2px;}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
@@ -80,7 +80,7 @@ export default function DrawPage() {
   .row{display:flex;gap:8px;align-items:center;}
   .row>*{flex:1;}
   .btn{background:#1c1712;border:1px solid var(--gold-dim);color:var(--gold);padding:10px;border-radius:3px;
-    cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase;width:100%;margin-top:6px;}
+    cursor:pointer;font-size:12px;letter-spacing:1px;text-transform:uppercase;width:100%;margin-top:6px;}
   .btn:hover{background:#271d10;}
   .btn.primary{background:var(--gold);color:#140f06;border-color:var(--gold);font-weight:600;}
   .btn.primary:hover{filter:brightness(1.08);}
@@ -118,7 +118,7 @@ export default function DrawPage() {
   .ref-toolbar label.small{
     width:auto;margin:0;display:inline-flex;align-items:center;gap:4px;
     background:#1c1712;border:1px solid var(--line);border-radius:3px;padding:10px 14px;
-    font-size:15px;letter-spacing:.3px;text-transform:uppercase;color:var(--text);
+    font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:var(--text);
   }
   .ref-toolbar .btn:hover{border-color:var(--gold-dim);background:#1c1712;}
   #exportOverlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;
@@ -140,7 +140,7 @@ export default function DrawPage() {
     border:1px solid var(--line);}
   .texture-box.open{display:block;}
   .prompt-chips{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px;background:#15110b;border:1px solid var(--line);border-radius:4px;}
-  .chip-label{font-size:14px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
+  .chip-label{font-size:12px;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
   .chip-row{display:flex;flex-wrap:wrap;gap:5px;}
   .prompt-chip{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:6px 11px;
     border-radius:14px;font-size:14px;cursor:pointer;white-space:nowrap;}
@@ -153,13 +153,13 @@ export default function DrawPage() {
   .menu-panel{display:none;}
   .menu-panel.open{display:block;}
   details.menu-cat{border-bottom:1px solid var(--line);padding:4px 0;}
-  details.menu-cat>summary{font-size:17px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;
+  details.menu-cat>summary{font-size:12px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;
     cursor:pointer;list-style:none;padding:9px 2px;line-height:1.3;}
   details.menu-cat>summary::-webkit-details-marker{display:none;}
   details.menu-cat>summary::before{content:'▸  ';}
   details.menu-cat[open]>summary::before{content:'▾  ';}
   details.menu-sub{margin:0 0 0 10px;}
-  details.menu-sub>summary{font-size:16px;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;
+  details.menu-sub>summary{font-size:12px;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;
     cursor:pointer;list-style:none;padding:7px 2px;line-height:1.3;}
   details.menu-sub>summary.med-icon{padding-left:38px;background-repeat:no-repeat;background-position:2px center;
     background-size:26px 26px;}
@@ -179,7 +179,7 @@ export default function DrawPage() {
   #valueSlider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
   #valueSlider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
   .ruler-tile.active{border-color:var(--gold);color:var(--gold);background:#231c10;}
-  label.adj-label{display:block;font-size:14px;color:var(--text-dim);letter-spacing:.3px;margin:8px 0 2px;text-transform:uppercase;}
+  label.adj-label{display:block;font-size:12px;color:var(--text-dim);letter-spacing:.3px;margin:8px 0 2px;text-transform:uppercase;}
   input.adj-slider{margin:0 0 2px;}
   code.tag{background:#1c1712;padding:2px 5px;border-radius:3px;color:var(--gold);}
   body.text-magnified .prompt-chip{font-size:17px;padding:8px 13px;}
