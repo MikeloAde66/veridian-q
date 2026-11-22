@@ -53,22 +53,20 @@ export async function POST(req: Request) {
   // glossy look. 0.22 kept the source pixels almost untouched -- which
   // fixed the smoothing, but then the chosen medium (impasto, monochromatic,
   // etc.) barely showed up: it looked too close to the original photo to
-  // read as a *painting preview*. 0.45 was the next middle ground, but every
-  // reported "muted/washed-out" result traced back to real photos that were
-  // themselves pale/hazy (overcast landscapes, soft portraits) -- at 0.45 the
-  // model still keeps well over half the source image's own desaturated
-  // pixel values, and no amount of prompt wording fully out-votes that much
-  // surviving source color. The earlier fix (bumping to 0.55) was gated on
-  // `pigments`, which is ONLY set when the artist clicks a named-pigment
-  // color swatch first -- typing pigment names directly into the free-text
-  // prompt (the actual way every muted-result report was produced) never
-  // touched that gate at all. Raising the baseline itself, unconditionally,
-  // so any photo-based Auto Paint gets real room for vivid color regardless
-  // of how the prompt was written.
+  // read as a *painting preview*. Pushing it up to 0.6/0.68 fixed muted
+  // color, but direct instruction (verbatim): "Auto paint is the mix and
+  // enhancement of the paint characteristic to the reference. Not recreate
+  // AI slop of something else. Just the paint." -- 0.6+ gives the model real
+  // room to depart from the photo's actual content, not just its rendering,
+  // which is the opposite of what this feature is for. Color vividness is
+  // now carried by vividnessClause/pigmentClause below as an explicit prompt
+  // override, not by strength -- so strength can come back down to where it
+  // belongs (how much paint texture/medium character to apply on top of the
+  // reference) without relying on high strength to also fix color.
   const pigments = Array.isArray(body.pigments) ? body.pigments.filter(Boolean) : [];
   const strength = typeof body.strength === 'number'
     ? body.strength
-    : pigments.length > 0 ? 0.68 : 0.6;
+    : pigments.length > 0 ? 0.5 : 0.45;
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -120,19 +118,36 @@ export async function POST(req: Request) {
     'this deliberate unevenness is what makes it read as a real physical painting made by hand, not a ' +
     'polished digital illustration, so do not smooth it away in pursuit of a tidier result';
 
+  // This is an enhancement pass over the reference photo, not a reimagining
+  // of it -- every object, face, pose and detail already in the photo has to
+  // stay recognizably itself. Only the paint medium's own qualities (texture,
+  // brushwork, color handling) get added on top. Earlier wording ("even where
+  // that means departing from the photo's own smoothness, sharpness or exact
+  // colors") was read by the model as license to depart from the photo's
+  // actual content, not just its photographic rendering -- removed.
+  //
+  // That fidelity rule is about CONTENT, not STYLE -- direct instruction:
+  // "It can add style and ethnic flavor to every painting or drawing."
+  // styleModifier and userPrompt (chosen art style, cultural/ethnic artistic
+  // tradition, mood, technique) are exactly the axis that's meant to vary
+  // freely; styleFlavorClause says so explicitly so the fidelity instruction
+  // above doesn't get over-applied to style too.
+  const styleFlavorClause =
+    'the chosen artistic style, technique, and any cultural or ethnic artistic tradition or flavor named above should come through fully and vividly in how it\'s painted -- that creative latitude belongs entirely to style and technique, never to changing what is actually depicted';
+
   const finalPrompt = imageUrl
     ? [
-        'Paint this subject in a real physical medium, as a genuine painting, not a filtered photo',
+        'Take this exact reference photo and repaint it as a real physical painting of the same subject -- same person or object, same pose, same expression, same framing, same composition, same scene -- do not invent, change, remove, or substitute anything that is actually in the photo',
         styleModifier,
         userPrompt,
         vividnessClause,
         pigmentClause,
-        'keep the same subject, pose, framing and composition as the reference photo',
-        'fully commit to the chosen medium\'s real physical qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- even where that means departing from the photo\'s own smoothness, sharpness or exact colors',
+        styleFlavorClause,
+        'the only thing changing is the medium: apply real paint/charcoal/pastel qualities -- visible brushstrokes, paint body and thickness, texture, grain, or linework -- on top of the photo\'s own content, not instead of it',
         'rough, scraggly, hand-made edges and texture, not photographic or airbrushed -- this should look and feel like paint, pastel, or charcoal on a surface, not a digital filter over a photo',
         messinessClause,
       ].filter(Boolean).join(', ')
-    : [styleModifier, userPrompt, pigmentClause, messinessClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
+    : [styleModifier, userPrompt, pigmentClause, styleFlavorClause, messinessClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
   const model = imageUrl ? MODELS.imageToImage : MODELS.textToImage;
   const input: Record<string, unknown> = {

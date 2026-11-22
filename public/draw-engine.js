@@ -29,6 +29,14 @@ let paperType = 'paynesgrey'; // which of the 7 SURFACES is active -- see SURFAC
 // opacity -- into an offscreen export canvas, the same way drawReferenceImg
 // already does for the reference photo, so exports match the live screen.
 const autoPaintOverlay = document.getElementById('autoPaintOverlay');
+// `parseFloat(el.style.opacity) || 1` silently forces full strength whenever
+// the real value is exactly 0 (0 is falsy) -- the one point where "no blend,
+// pure original" should be reachable. Use this everywhere instead so the
+// full 0-100 range of the Opacity fader actually reaches both ends.
+function opacityOf(el){
+  const v = parseFloat(el.style.opacity);
+  return isNaN(v) ? 1 : v;
+}
 function drawAutoPaintOverlayImg(ctx){
   if (!autoPaintOverlay || autoPaintOverlay.style.display === 'none' || !autoPaintOverlay.src || !autoPaintOverlay.naturalWidth) return;
   const iw = autoPaintOverlay.naturalWidth, ih = autoPaintOverlay.naturalHeight;
@@ -36,7 +44,7 @@ function drawAutoPaintOverlayImg(ctx){
   const dw = iw*scale, dh = ih*scale;
   const dx = (baseW-dw)/2, dy = (baseH-dh)/2;
   const prevAlpha = ctx.globalAlpha;
-  ctx.globalAlpha = parseFloat(autoPaintOverlay.style.opacity) || 1;
+  ctx.globalAlpha = opacityOf(autoPaintOverlay);
   ctx.drawImage(autoPaintOverlay, dx, dy, dw, dh);
   ctx.globalAlpha = prevAlpha;
 }
@@ -549,21 +557,29 @@ function fullRedraw(ctx){
   drawLayeredStrokes(ctx);
 }
 // The reference photo is an on-screen tracing aid (css-positioned <img>, never
-// part of the paintable canvas), so by default it never shows up in an export --
-// only the paper and whatever was actually painted does. Checking "Include in
-// export" draws it into the base canvas too, object-fit:cover style (same crop
-// math the on-screen <img> uses), at whatever opacity it's currently set to, so
-// it bakes in as a backdrop under the strokes rather than replacing them.
+// part of the paintable canvas). With NO Auto Paint result, it only bakes into
+// an export when "Include in export" is checked, same as before. But once an
+// Auto Paint result IS on screen, the photo is the Opacity fader's blend
+// target -- on screen it sits directly behind #autoPaintOverlay, so dialing
+// the AI result down reveals it. Export has to draw that same backdrop
+// unconditionally (ignoring the checkbox, which predates Auto Paint and means
+// something different -- "bake the raw photo under my hand-drawn strokes"),
+// or the blend has nothing to fade into and exporting below 100% just looks
+// like a dimmer painting instead of a real blend. Matches the mini-monitor's
+// live-preview compositing, which already does this unconditionally.
 function drawReferenceImg(ctx){
-  const chk = document.getElementById('refExportChk');
-  if (!chk || !chk.checked) return;
   if (!refImg || refImg.style.display === 'none' || !refImg.src || !refImg.naturalWidth) return;
+  const aiActive = autoPaintOverlay && autoPaintOverlay.style.display === 'block' && autoPaintOverlay.src && autoPaintOverlay.naturalWidth;
+  if (!aiActive){
+    const chk = document.getElementById('refExportChk');
+    if (!chk || !chk.checked) return;
+  }
   const iw = refImg.naturalWidth, ih = refImg.naturalHeight;
   const scale = Math.max(baseW/iw, baseH/ih);
   const dw = iw*scale, dh = ih*scale;
   const dx = (baseW-dw)/2, dy = (baseH-dh)/2;
   const prevAlpha = ctx.globalAlpha;
-  ctx.globalAlpha = parseFloat(refImg.style.opacity) || 1;
+  ctx.globalAlpha = opacityOf(refImg);
   ctx.drawImage(refImg, dx, dy, dw, dh);
   ctx.globalAlpha = prevAlpha;
 }
@@ -1155,6 +1171,7 @@ document.getElementById('refFileInput').addEventListener('change', e=>{
     const traceChk0 = document.getElementById('traceChk');
     if (traceChk0) traceChk0.disabled = false;
     scheduleAutosave();
+    analyzeReferencePalette(resizedSrc);
   };
   reader.readAsDataURL(file);
 });
@@ -1165,6 +1182,7 @@ document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   if (traceChk0) { traceChk0.checked=false; traceChk0.disabled=false; }
   paperCv.style.opacity=1;
   scheduleAutosave();
+  hidePaletteAnalysis();
 });
 
 // A platform-level rejection (body too large, gateway timeout, etc.) returns
@@ -1179,6 +1197,91 @@ async function safeJson(res){
     return { ok: false, error: snippet };
   }
 }
+
+// ---------- Reference palette analysis: separate vision call, never touches painting ----------
+// Advisory only. Feeds the "Use in Prompt" pigment clause on request; it
+// does not gate strength or vividness on /api/generate -- those are
+// unconditional on that route now, analyzer connected or not.
+const paletteLoading = document.getElementById('paletteLoading');
+const paletteAnalysis = document.getElementById('paletteAnalysis');
+const paletteTemp = document.getElementById('paletteTemp');
+const paletteSwatches = document.getElementById('paletteSwatches');
+const paletteSummary = document.getElementById('paletteSummary');
+const usePaletteBtn = document.getElementById('usePaletteBtn');
+let lastPaletteData = null;
+
+function hidePaletteAnalysis(){
+  paletteLoading.style.display = 'none';
+  paletteAnalysis.classList.remove('show');
+  lastPaletteData = null;
+}
+
+function dataUrlToBlob(dataUrl){
+  const [header, b64] = dataUrl.split(',');
+  const mime = (header.match(/data:(.*?);base64/) || [,'image/jpeg'])[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function analyzeReferencePalette(dataUrl){
+  hidePaletteAnalysis();
+  paletteLoading.style.display = 'block';
+  try{
+    const form = new FormData();
+    form.append('file', dataUrlToBlob(dataUrl), 'reference.jpg');
+    const upRes = await fetch('/api/upload', { method:'POST', body: form });
+    const upData = await safeJson(upRes);
+    if(!upRes.ok || !upData.url) throw new Error(upData.error || 'Upload failed.');
+
+    const anRes = await fetch('/api/analyze-palette', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imageUrl: upData.url }),
+    });
+    const data = await safeJson(anRes);
+    if(!anRes.ok) throw new Error(data.error || 'Analysis failed.');
+
+    paletteLoading.style.display = 'none';
+    if(!data.colors || !data.colors.length){
+      paletteSummary.textContent = data.summary || 'Could not analyze this image.';
+      paletteTemp.textContent = '';
+      paletteSwatches.innerHTML = '';
+      paletteAnalysis.classList.add('show');
+      lastPaletteData = null;
+      return;
+    }
+    lastPaletteData = data;
+    paletteTemp.textContent = data.temperature || '';
+    paletteSummary.textContent = data.summary || '';
+    paletteSwatches.innerHTML = '';
+    data.colors.forEach(c=>{
+      const sw = document.createElement('div');
+      sw.className = 'palette-swatch';
+      sw.style.background = c.hex || '#888';
+      sw.title = `${c.name}${c.hex ? ' ('+c.hex+')' : ''}`;
+      paletteSwatches.appendChild(sw);
+    });
+    paletteAnalysis.classList.add('show');
+  }catch(err){
+    paletteLoading.style.display = 'none';
+    paletteSummary.textContent = 'Palette analysis unavailable: ' + (err && err.message ? err.message : 'unknown error');
+    paletteTemp.textContent = '';
+    paletteSwatches.innerHTML = '';
+    paletteAnalysis.classList.add('show');
+    lastPaletteData = null;
+  }
+}
+
+usePaletteBtn.addEventListener('click', ()=>{
+  if(!lastPaletteData || !lastPaletteData.colors || !lastPaletteData.colors.length) return;
+  const names = lastPaletteData.colors.map(c=>c.name).join(', ');
+  const tempWord = lastPaletteData.temperature ? lastPaletteData.temperature + ' ' : '';
+  const phrase = `${tempWord}palette -- ${names}`.trim();
+  const current = autoPaintPrompt.value.trim();
+  autoPaintPrompt.value = current ? `${current}, ${phrase}` : phrase;
+});
 
 const refOpacity = document.getElementById('refOpacity'), refOpVal = document.getElementById('refOpVal');
 // Double duty, depending on what's actually on screen: with an Auto Paint
@@ -1681,12 +1784,12 @@ window.addEventListener('load', bootPaint);
       mctx.filter = (typeof adjustFilterString === 'function') ? adjustFilterString() : 'none';
       mctx.drawImage(paperCv, dx, dy, dw, dh);
       if (refImg && refImg.style.display !== 'none' && refImg.src){
-        mctx.globalAlpha = parseFloat(refImg.style.opacity) || 1;
+        mctx.globalAlpha = opacityOf(refImg);
         mctx.drawImage(refImg, dx, dy, dw, dh);
         mctx.globalAlpha = 1;
       }
       if (autoPaintOverlay && autoPaintOverlay.style.display !== 'none' && autoPaintOverlay.src && autoPaintOverlay.naturalWidth){
-        mctx.globalAlpha = parseFloat(autoPaintOverlay.style.opacity) || 1;
+        mctx.globalAlpha = opacityOf(autoPaintOverlay);
         mctx.drawImage(autoPaintOverlay, dx, dy, dw, dh);
         mctx.globalAlpha = 1;
       }

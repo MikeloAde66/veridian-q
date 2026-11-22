@@ -114,6 +114,13 @@ export default function DrawPage() {
   .ref-toolbar .btn{margin-top:0;}
   .ref-panel{display:none;align-items:center;gap:10px;flex-wrap:wrap;}
   .ref-panel.open{display:flex;}
+  .palette-analysis{display:none;align-items:center;gap:8px;flex-wrap:wrap;width:100%;
+    margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+  .palette-analysis.show{display:flex;}
+  .palette-temp{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);}
+  .palette-swatches{display:flex;gap:4px;}
+  .palette-swatch{width:20px;height:20px;border-radius:3px;border:1px solid var(--line);flex:0 0 20px;}
+  .palette-summary{font-size:13px;color:var(--text-dim);flex:1;min-width:160px;}
   /* Matches the PROJECT tile style (button.tile) so this toolbar reads as
      part of the same system instead of a separate pill treatment. */
   .ref-toolbar .btn,
@@ -417,6 +424,13 @@ export default function DrawPage() {
           <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;" title="Bake the reference photo into the exported file, under your strokes">
             <input type="checkbox" id="refExportChk" style="width:auto;"> Include in export
           </label>
+          <span id="paletteLoading" class="hint" style="display:none;width:100%;">Analyzing reference photo's palette…</span>
+          <div id="paletteAnalysis" class="palette-analysis">
+            <span id="paletteTemp" class="palette-temp"></span>
+            <div id="paletteSwatches" class="palette-swatches"></div>
+            <span id="paletteSummary" class="palette-summary"></span>
+            <button class="btn" id="usePaletteBtn" type="button" style="width:auto;">Use in Prompt</button>
+          </div>
         </div>
       </div>
       <div class="canvas-wrap" id="canvasWrap">
