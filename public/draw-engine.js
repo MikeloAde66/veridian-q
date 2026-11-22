@@ -19,17 +19,26 @@ let color = '#1a1a1a';
 let brushSize = 14;
 let paperType = 'paynesgrey'; // which of the 7 SURFACES is active -- see SURFACES below
 
-// Auto Paint draws its generated image straight onto the paper canvas's own
-// pixels (pctx.drawImage below) so it sits under the brush strokes exactly
-// like a real underpainting -- but that means it's not represented anywhere
-// as data, only as pixels already drawn. fullRedraw() used to just call
-// drawPaper() fresh, which regenerates the surface texture from scratch and
-// has no idea an Auto Paint image was ever drawn on top of it -- so every
-// export silently dropped the Auto Paint result and shipped a blank surface.
-// Keeping the image + its placement here lets fullRedraw() replay it.
-let autoPaintImg = null; // {img, dx, dy, dw, dh} in base (1000x1300) coordinates, or null
-function drawAutoPaintImg(ctx){
-  if (autoPaintImg) ctx.drawImage(autoPaintImg.img, autoPaintImg.dx, autoPaintImg.dy, autoPaintImg.dw, autoPaintImg.dh);
+// Auto Paint's result is a separate, CSS-positioned <img> (#autoPaintOverlay),
+// layered between the reference photo and the live strokes -- NOT baked into
+// paperCv's own pixels. That's what makes the Opacity slider able to blend it
+// live against the original photo underneath: at 100% the result fully covers
+// the photo (what Auto Paint should look like by default), dialing down fades
+// the result out and reveals the original underneath, with no re-generation
+// needed. drawAutoPaintOverlayImg replays that same element -- at its current
+// opacity -- into an offscreen export canvas, the same way drawReferenceImg
+// already does for the reference photo, so exports match the live screen.
+const autoPaintOverlay = document.getElementById('autoPaintOverlay');
+function drawAutoPaintOverlayImg(ctx){
+  if (!autoPaintOverlay || autoPaintOverlay.style.display === 'none' || !autoPaintOverlay.src || !autoPaintOverlay.naturalWidth) return;
+  const iw = autoPaintOverlay.naturalWidth, ih = autoPaintOverlay.naturalHeight;
+  const scale = Math.max(baseW/iw, baseH/ih);
+  const dw = iw*scale, dh = ih*scale;
+  const dx = (baseW-dw)/2, dy = (baseH-dh)/2;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = parseFloat(autoPaintOverlay.style.opacity) || 1;
+  ctx.drawImage(autoPaintOverlay, dx, dy, dw, dh);
+  ctx.globalAlpha = prevAlpha;
 }
 let pressureMode = 'auto';
 let lastPt = null, lastTime = 0;
@@ -76,7 +85,6 @@ Object.keys(SURFACE_PHOTOS).forEach(type => {
     // photo is ready, so it swaps in without needing a surface change
     if (paperType === type && typeof pctx !== 'undefined' && pctx) {
       drawPaper(pctx);
-      drawAutoPaintImg(pctx);
     }
   };
   img.src = SURFACE_PHOTOS[type];
@@ -537,7 +545,7 @@ function drawLayeredStrokes(ctx){
 function fullRedraw(ctx){
   drawPaper(ctx);
   drawReferenceImg(ctx);
-  drawAutoPaintImg(ctx);
+  drawAutoPaintOverlayImg(ctx);
   drawLayeredStrokes(ctx);
 }
 // The reference photo is an on-screen tracing aid (css-positioned <img>, never
@@ -757,7 +765,7 @@ updateSurfacePreview();
 surfaceSel.addEventListener('change', ()=>{
   paperType = surfaceSel.value;
   updateSurfacePreview();
-  drawPaper(pctx); drawAutoPaintImg(pctx);
+  drawPaper(pctx);
   scheduleAutosave();
 });
 textureToggle.addEventListener('click', ()=>{
@@ -1139,13 +1147,23 @@ document.getElementById('refFileInput').addEventListener('change', e=>{
   const reader = new FileReader();
   reader.onload = async ev=>{
     const resizedSrc = await resizeImageDataUrl(ev.target.result, 1600);
-    refImg.src = resizedSrc; refImg.style.display='block'; scheduleAutosave();
+    refImg.src = resizedSrc; refImg.style.display='block';
+    // A newly imported photo invalidates any previous Auto Paint result (it
+    // was painted from a different photo) -- clear the overlay and give
+    // Trace back to the artist for tracing the new photo by hand.
+    autoPaintOverlay.style.display = 'none'; autoPaintOverlay.src = '';
+    const traceChk0 = document.getElementById('traceChk');
+    if (traceChk0) traceChk0.disabled = false;
+    scheduleAutosave();
   };
   reader.readAsDataURL(file);
 });
 document.getElementById('clearRefBtn').addEventListener('click', ()=>{
   refImg.style.display='none'; refImg.src='';
-  document.getElementById('traceChk').checked=false; paperCv.style.opacity=1;
+  autoPaintOverlay.style.display='none'; autoPaintOverlay.src='';
+  const traceChk0 = document.getElementById('traceChk');
+  if (traceChk0) { traceChk0.checked=false; traceChk0.disabled=false; }
+  paperCv.style.opacity=1;
   scheduleAutosave();
 });
 
@@ -1163,7 +1181,21 @@ async function safeJson(res){
 }
 
 const refOpacity = document.getElementById('refOpacity'), refOpVal = document.getElementById('refOpVal');
-refOpacity.addEventListener('input', ()=>{ refImg.style.opacity = refOpacity.value/100; refOpVal.textContent = refOpacity.value; scheduleAutosave(); });
+// Double duty, depending on what's actually on screen: with an Auto Paint
+// result present, this is the result's own blend against the original photo
+// (100% = full result, dial down to bring the original back through). With
+// no result yet, it's the original trace-paper behavior -- fading the raw
+// photo for drawing over it by hand.
+refOpacity.addEventListener('input', ()=>{
+  const v = refOpacity.value/100;
+  if (autoPaintOverlay.style.display === 'block') {
+    autoPaintOverlay.style.opacity = v;
+  } else {
+    refImg.style.opacity = v;
+  }
+  refOpVal.textContent = refOpacity.value;
+  scheduleAutosave();
+});
 document.getElementById('traceChk').addEventListener('change', e=>{ paperCv.style.opacity = e.target.checked ? 0.32 : 1; });
 
 // ---------- Auto Paint ----------
@@ -1221,20 +1253,6 @@ function hasReferencePhoto(){
   return !!(refImg.src && refImg.style.display !== 'none');
 }
 
-// Snapshot of just the artist's own paint (paper + any prior Auto Paint
-// result + brush strokes) -- deliberately excludes the reference photo even
-// if "Include in export" is checked, since in dual conditioning the photo
-// travels separately as the ControlNet control image. Baking it in here too
-// would feed it to the model twice in two different roles.
-function captureCanvasPaintDataUrl(){
-  const off = document.createElement('canvas'); off.width = baseW; off.height = baseH;
-  const octx = off.getContext('2d', {willReadFrequently:true});
-  drawPaper(octx);
-  drawAutoPaintImg(octx);
-  drawLayeredStrokes(octx);
-  return off.toDataURL('image/png');
-}
-
 autoPaintBtn.addEventListener('click', async ()=>{
   const prompt = autoPaintPrompt.value.trim();
   const styleModifier = STYLE_PROMPTS[styleSel.value] || '';
@@ -1267,23 +1285,6 @@ autoPaintBtn.addEventListener('click', async ()=>{
       autoPaintHint.textContent = 'Repainting your reference photo\u2026';
     }
 
-    // Dual conditioning: only kicks in when there's BOTH a reference photo
-    // AND something actually painted on the canvas already -- a blank canvas
-    // has nothing worth preserving as the base image.
-    let canvasImageUrl;
-    const hasCanvasPaint = withPhoto && strokes.length > 0;
-    if (hasCanvasPaint) {
-      autoPaintHint.textContent = 'Uploading your canvas paint\u2026';
-      const canvasBlob = await (await fetch(captureCanvasPaintDataUrl())).blob();
-      const canvasForm = new FormData();
-      canvasForm.append('file', canvasBlob, 'canvas.png');
-      const canvasUpRes = await fetch('/api/upload', { method: 'POST', body: canvasForm });
-      const canvasUpData = await safeJson(canvasUpRes);
-      if (!canvasUpRes.ok || !canvasUpData.url) throw new Error(canvasUpData.error || 'Canvas paint upload failed.');
-      canvasImageUrl = canvasUpData.url;
-      autoPaintHint.textContent = 'Repainting your canvas, guided by the reference\u2026';
-    }
-
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1291,8 +1292,6 @@ autoPaintBtn.addEventListener('click', async ()=>{
         prompt,
         styleModifier,
         imageUrl,
-        canvasImageUrl,
-        traceOpacity: Number(refOpacity.value),
         pigments: activePigmentName ? [activePigmentName] : [],
       }),
     });
@@ -1301,43 +1300,34 @@ autoPaintBtn.addEventListener('click', async ()=>{
       throw new Error(data.error || `Request failed (${res.status})`);
     }
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = ()=>{
-      // Cover-fit the result onto the paper canvas (texture preserved underneath
-      // via drawPaper), then the artist keeps drawing on top with brush tools.
-      const cw = paperCv.width, ch = paperCv.height;
-      const scale = Math.max(cw/img.width, ch/img.height);
-      const dw = img.width*scale, dh = img.height*scale;
-      const dx = (cw-dw)/2, dy = (ch-dh)/2;
-      autoPaintImg = {img, dx, dy, dw, dh}; // keep it so exports (fullRedraw) can replay it
-      drawPaper(pctx);
-      drawAutoPaintImg(pctx);
-      // The reference photo is a separate, CSS-positioned <img> that sits
-      // visually ON TOP of this canvas (see drawReferenceImg's comment) --
-      // at a high Opacity it fully covers whatever just got painted
-      // underneath, even though the paint is genuinely there. Without this,
-      // the artist has no way to tell Auto Paint worked short of manually
-      // dragging Opacity down themselves. Fade it back so the result Auto
-      // Paint just produced is actually visible, while leaving a faint
-      // trace of the reference for anyone still using it to guide brushwork.
-      if (withPhoto && refOpacity && Number(refOpacity.value) > 15) {
-        refOpacity.value = 15;
-        refImg.style.opacity = 0.15;
-        refOpVal.textContent = '15';
-        scheduleAutosave();
-      }
+    autoPaintOverlay.onload = ()=>{
+      // The result is a separate overlay <img>, not baked into the canvas --
+      // it shows at 100% (fully covering the original photo underneath) the
+      // moment it lands, exactly like a direct image-to-image result should.
+      // The artist dials Opacity down themselves afterward if they want to
+      // blend back toward the original photo; nothing auto-fades anymore.
+      autoPaintOverlay.style.display = 'block';
+      autoPaintOverlay.style.opacity = 1;
+      if (refOpacity) { refOpacity.value = 100; refOpVal.textContent = '100'; }
+      // Trace is a manual-tracing aid for drawing over the RAW photo -- once
+      // there's an Auto Paint result to look at instead, tracing the original
+      // underneath it no longer makes sense, so it's disabled until the
+      // result is cleared.
+      const traceChk = document.getElementById('traceChk');
+      if (traceChk) { traceChk.checked = false; traceChk.disabled = true; }
+      paperCv.style.opacity = 1;
+      scheduleAutosave();
       autoPaintHint.textContent = DEFAULT_AUTOPAINT_HINT;
       autoPaintBtn.disabled = false;
       autoPaintBtn.textContent = 'Auto Paint';
     };
-    img.onerror = ()=>{
+    autoPaintOverlay.onerror = ()=>{
       autoPaintHint.textContent = 'Image generated but failed to load into the canvas.';
       autoPaintHint.style.color = '#d87a3d';
       autoPaintBtn.disabled = false;
       autoPaintBtn.textContent = 'Auto Paint';
     };
-    img.src = data.imageUrl;
+    autoPaintOverlay.src = data.imageUrl;
   } catch (err) {
     autoPaintHint.textContent = `Auto Paint failed: ${err.message}`;
     autoPaintHint.style.color = '#d87a3d';
@@ -1603,6 +1593,9 @@ function saveProject(keepRefPhoto){
     ref: (refImg && refImg.src && refImg.style.display !== 'none' && keepRefPhoto !== false)
       ? { src: refImg.src, opacity: refImg.style.opacity }
       : null,
+    autoPaintResult: (autoPaintOverlay && autoPaintOverlay.src && autoPaintOverlay.style.display !== 'none' && keepRefPhoto !== false)
+      ? { src: autoPaintOverlay.src, opacity: autoPaintOverlay.style.opacity }
+      : null,
   };
   try{
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
@@ -1611,6 +1604,7 @@ function saveProject(keepRefPhoto){
     // retry without the photo so the painting itself still gets saved.
     try{
       data.ref = null;
+      data.autoPaintResult = null;
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
     }catch(e2){ /* give up quietly -- autosave is best-effort */ }
   }
@@ -1640,6 +1634,17 @@ function restoreProject(){
       refOpacity.value = Math.round((parseFloat(data.ref.opacity)||0.5)*100);
       refOpVal.textContent = refOpacity.value;
     }
+  }
+  if(data.autoPaintResult && data.autoPaintResult.src){
+    autoPaintOverlay.src = data.autoPaintResult.src;
+    autoPaintOverlay.style.display = 'block';
+    autoPaintOverlay.style.opacity = data.autoPaintResult.opacity || 1;
+    if(refOpacity){
+      refOpacity.value = Math.round((parseFloat(data.autoPaintResult.opacity)||1)*100);
+      refOpVal.textContent = refOpacity.value;
+    }
+    const traceChk0 = document.getElementById('traceChk');
+    if(traceChk0){ traceChk0.checked = false; traceChk0.disabled = true; }
   }
   renderLayersPanel();
   redrawLiveStrokes();
@@ -1678,6 +1683,11 @@ window.addEventListener('load', bootPaint);
       if (refImg && refImg.style.display !== 'none' && refImg.src){
         mctx.globalAlpha = parseFloat(refImg.style.opacity) || 1;
         mctx.drawImage(refImg, dx, dy, dw, dh);
+        mctx.globalAlpha = 1;
+      }
+      if (autoPaintOverlay && autoPaintOverlay.style.display !== 'none' && autoPaintOverlay.src && autoPaintOverlay.naturalWidth){
+        mctx.globalAlpha = parseFloat(autoPaintOverlay.style.opacity) || 1;
+        mctx.drawImage(autoPaintOverlay, dx, dy, dw, dh);
         mctx.globalAlpha = 1;
       }
       mctx.drawImage(cv, dx, dy, dw, dh);

@@ -1,28 +1,31 @@
 import { NextResponse } from 'next/server';
-import { fal, MODELS, CONTROLNET_UNION_PRO } from '@/lib/fal';
+import { fal, MODELS } from '@/lib/fal';
 
 // Auto Paint backend -- wired the same way the proven "Activate Q" button
 // on the other Veridian Q site works: the official @fal-ai/client SDK
 // (fal.subscribe, which queues/polls reliably) against a real https image
 // URL, never a browser data: URL (the fal models can't fetch those).
-// - imageUrl + canvasImageUrl both present -> dual conditioning: the artist's
-//   own canvas paint is the base image being restyled, the reference photo
-//   only steers structure/anatomy through a ControlNet (ControlNet-Union-Pro,
-//   canny mode) scaled by traceOpacity. Neither image is dropped.
-// - imageUrl only -> image-to-image, repaints the reference photo in the
-//   chosen style (unchanged from before).
+// Deliberately kept to two simple paths, direct image-to-image:
+// - imageUrl present -> image-to-image, repaints the reference photo in the
+//   chosen style.
 // - no imageUrl -> text-to-image, generates purely from the typed prompt + style.
 // Either prompt or imageUrl must be present -- the route refuses to run
-// blind with neither (no photo, no prompt = nothing to go on). canvasImageUrl
-// alone (no reference photo) is ignored -- it only matters paired with one.
+// blind with neither (no photo, no prompt = nothing to go on).
+//
+// There used to be a third path here: canvas-paint + reference-photo "dual
+// conditioning" through a ControlNet-Union, with the reference photo only
+// steering structure/anatomy rather than being repainted directly. Dropped
+// on direct request -- it added a second strength value, a second model, and
+// a ControlNet payload shape that took three separate production bugs to get
+// right, on top of a client-side canvas-paint upload step. Direct
+// image-to-image on the photo itself is simpler and was the known-working
+// baseline; it's the one path this route exercises now.
 
 type GenerateBody = {
   prompt?: string;
   styleModifier?: string;
   imageUrl?: string;
-  canvasImageUrl?: string; // the artist's own current paint layers, https url
   strength?: number; // 0-1, image-to-image only: how far to depart from the photo
-  traceOpacity?: number; // 0-100 from the Reference Opacity slider; dual-conditioning only
   pigments?: string[]; // active pigment names (e.g. "Burnt Sienna"), mentioned in the prompt
 };
 
@@ -66,10 +69,6 @@ export async function POST(req: Request) {
   const strength = typeof body.strength === 'number'
     ? body.strength
     : pigments.length > 0 ? 0.68 : 0.6;
-  const canvasImageUrl = body.canvasImageUrl?.trim();
-  // Dual conditioning only makes sense paired with a reference photo -- canvas
-  // paint alone (no photo) just falls through to the existing single-image path.
-  const dualConditioning = Boolean(imageUrl) && Boolean(canvasImageUrl);
 
   if (!userPrompt && !imageUrl) {
     return NextResponse.json(
@@ -135,51 +134,12 @@ export async function POST(req: Request) {
       ].filter(Boolean).join(', ')
     : [styleModifier, userPrompt, pigmentClause, messinessClause].filter(Boolean).join(', ') || styleModifier || 'a painting';
 
-  const model = dualConditioning
-    ? MODELS.dualConditioned
-    : imageUrl
-    ? MODELS.imageToImage
-    : MODELS.textToImage;
+  const model = imageUrl ? MODELS.imageToImage : MODELS.textToImage;
   const input: Record<string, unknown> = {
     prompt: finalPrompt,
     num_images: 1,
   };
-  if (dualConditioning) {
-    // The artist's own canvas paint is the base image actually being
-    // restyled (same role imageUrl plays in the single-image path below) --
-    // the reference photo never gets blended in directly, it only steers
-    // structure/anatomy through the ControlNet. Strength is pulled down a
-    // touch from the single-image default: canvas paint is already the
-    // artist's own composition, so it needs less forced departure than a
-    // straight photo does to read as "painted."
-    const dualStrength = Math.max(0.3, Number((strength - 0.1).toFixed(2)));
-    // traceOpacity (0-100, from the Reference Opacity slider) becomes the
-    // ControlNet's conditioning_scale: how strongly the photo's structure
-    // constrains the result. Capped at .55 -- full strength here fights the
-    // "paint it, don't trace it" instructions above.
-    const traceScale = Number((((body.traceOpacity ?? 50) / 100) * 0.55).toFixed(2));
-    input.image_url = canvasImageUrl;
-    input.strength = dualStrength;
-    // Union-Pro is a *union* ControlNet -- fal's flux-general endpoint only
-    // wires up `control_mode` correctly when it's passed via the separate
-    // `controlnet_unions` array, AND the control image/mode/scale are nested
-    // one level deeper under that item's own `controls` array (confirmed via
-    // fal's schema: ControlNetUnion = { path, controls: ControlNetUnionInput[] },
-    // not flat fields on the ControlNetUnion item itself). The flat-fields
-    // version was rejected with "controls: Field required".
-    input.controlnet_unions = [
-      {
-        path: CONTROLNET_UNION_PRO,
-        controls: [
-          {
-            control_image_url: imageUrl,
-            conditioning_scale: traceScale,
-            control_mode: 'canny',
-          },
-        ],
-      },
-    ];
-  } else if (imageUrl) {
+  if (imageUrl) {
     // No image_size here: forcing 'square_hd' was stretching/cropping every
     // non-square reference photo into a square before the model even started,
     // which on its own would make the result look like a different photo.
@@ -195,7 +155,7 @@ export async function POST(req: Request) {
   // below ever logged anything), which made it impossible to tell "nothing
   // was clicked" apart from "it ran and came back fine" from the server
   // side alone. This one line is the difference between those two cases.
-  console.log('generate request', 'model:', model, 'strength:', dualConditioning ? undefined : strength, 'dualConditioning:', dualConditioning, 'promptLength:', finalPrompt.length);
+  console.log('generate request', 'model:', model, 'strength:', imageUrl ? strength : undefined, 'promptLength:', finalPrompt.length);
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

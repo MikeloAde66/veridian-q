@@ -89,6 +89,7 @@ export default function DrawPage() {
   #stage{position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);}
   #stage canvas,#stage img{position:absolute;left:0;top:0;width:100%;height:100%;}
   #refImg{object-fit:cover;pointer-events:none;display:none;background:#333;}
+  #autoPaintOverlay{object-fit:cover;pointer-events:none;display:none;}
   #paperCv{touch-action:none;}
   #cv{touch-action:none;background:transparent;mix-blend-mode:multiply;image-rendering:pixelated;}
   .zoom-bar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-top:1px solid var(--line);background:var(--panel);}
@@ -422,6 +423,7 @@ export default function DrawPage() {
         <div id="stage">
           <canvas id="paperCv" width="1000" height="1300"></canvas>
           <img id="refImg" alt="reference">
+          <img id="autoPaintOverlay" alt="auto paint result" crossOrigin="anonymous">
           <canvas id="cv" width="1000" height="1300"></canvas>
           <div id="rulerOverlay"></div>
           <div id="cropBox"></div>
