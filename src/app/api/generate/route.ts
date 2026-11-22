@@ -131,7 +131,13 @@ export async function POST(req: Request) {
     const traceScale = Number((((body.traceOpacity ?? 50) / 100) * 0.55).toFixed(2));
     input.image_url = canvasImageUrl;
     input.strength = dualStrength;
-    input.controlnets = [
+    // Union-Pro is a *union* ControlNet -- fal's flux-general endpoint only
+    // wires up `control_mode` correctly when it's passed via the separate
+    // `controlnet_unions` array. Putting a union model in the plain
+    // `controlnets` array (singular-mode ControlNets) left the pipeline's
+    // internal controlnet_mode tensor unset, which fal rejected as a 422:
+    // "controlnet_mode cannot be None when applying ControlNet-Union".
+    input.controlnet_unions = [
       {
         path: CONTROLNET_UNION_PRO,
         control_image_url: imageUrl,
