@@ -95,6 +95,7 @@ export default function DrawPage() {
   .zoom-bar input[type=range]{flex:1;}
   .zoom-bar .zlabel{font-size:13px;color:var(--text-dim);min-width:120px;text-align:right;letter-spacing:.5px;}
   .hint{font-size:16px;color:var(--text-dim);line-height:1.5;margin-top:4px;}
+  .live-preview-dock{position:fixed;top:112px;right:14px;z-index:40;}
   .mini-monitor{display:flex;flex-direction:column;align-items:center;margin-top:10px;}
   .mini-monitor-screen{background:#0a0a0a;border:3px solid #3a342c;border-radius:6px;
     padding:6px;box-shadow:inset 0 0 6px rgba(0,0,0,.6);}
@@ -535,11 +536,13 @@ export default function DrawPage() {
         <input type="checkbox" id="bleedChk" style="width:auto;"> <span class="small">Bleed</span>
       </label>
       <button class="btn primary" id="exportBtn" style="margin-top:10px;">Export</button>
+      </div>
+    </aside>
+    <div class="live-preview-dock">
       <div class="mini-monitor" id="miniMonitor" title="Live preview">
         <div class="mini-monitor-screen"><canvas id="miniMonitorCv" width="240" height="180"></canvas></div>
       </div>
-      </div>
-    </aside>
+    </div>
   </div>
 </div>
 
