@@ -190,6 +190,13 @@ export async function POST(req: Request) {
     input.image_size = 'square_hd';
   }
 
+  // Log that a request actually arrived, before calling fal -- a successful
+  // run previously left zero trace in Vercel's logs (only the catch block
+  // below ever logged anything), which made it impossible to tell "nothing
+  // was clicked" apart from "it ran and came back fine" from the server
+  // side alone. This one line is the difference between those two cases.
+  console.log('generate request', 'model:', model, 'strength:', dualConditioning ? undefined : strength, 'dualConditioning:', dualConditioning, 'promptLength:', finalPrompt.length);
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (fal.subscribe as any)(model, { input, logs: false });
@@ -197,9 +204,11 @@ export async function POST(req: Request) {
     const images = (result.data as { images?: { url?: string }[] })?.images ?? [];
     const outUrl = images[0]?.url;
     if (!outUrl) {
+      console.error('generate: fal returned no image', JSON.stringify(result.data));
       return NextResponse.json({ ok: false, error: 'No image returned.', body: result.data }, { status: 502 });
     }
 
+    console.log('generate succeeded', outUrl);
     return NextResponse.json({ ok: true, imageUrl: outUrl, finalPrompt });
   } catch (err) {
     // fal's ApiError puts the real validation detail in `.body` (422s), which

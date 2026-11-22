@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
     }
 
+    console.log('upload request', 'bytes:', file.size, 'type:', file.type);
     const url = await fal.storage.upload(file);
+    console.log('upload succeeded', url);
     return NextResponse.json({ url });
   } catch (err) {
     console.error("upload failed", err);
