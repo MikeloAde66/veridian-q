@@ -529,6 +529,7 @@ function stampAt(ctx, stroke, pt, idx){
 
 // ---------- drawing a whole stroke / whole scene ----------
 function drawStrokePoints(ctx, stroke, fromIdx){
+  if (stroke.medium === 'bucketfill'){ drawBucketFillStroke(ctx, stroke); return; }
   for(let i=fromIdx;i<stroke.points.length;i++) stampAt(ctx, stroke, stroke.points[i], i);
 }
 const layerScratch = document.createElement('canvas');
@@ -604,21 +605,104 @@ function pressureFor(e, speed){
   return Math.max(0.15, 1-norm);
 }
 // ---------- Move & Crop tools ----------
-let activeTool = 'draw'; // 'draw' | 'move' | 'crop'
+let activeTool = 'draw'; // 'draw' | 'move' | 'crop' | 'bucket'
 let panning = false, panStart = null, panScroll = null;
 let cropping = false, cropStartPt = null;
 const toolMove = document.getElementById('toolMove');
 const toolCrop = document.getElementById('toolCrop');
+const toolCropTile = document.getElementById('toolCropTile');
+const toolBucketTile = document.getElementById('toolBucketTile');
+const bucketHint = document.getElementById('bucketHint');
 const cropBox = document.getElementById('cropBox');
 function setTool(t){
   activeTool = (activeTool === t) ? 'draw' : t;
   toolMove.classList.toggle('active', activeTool==='move');
   toolCrop.classList.toggle('active', activeTool==='crop');
-  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' ? 'crosshair' : 'default');
+  if (toolCropTile) toolCropTile.classList.toggle('active', activeTool==='crop');
+  if (toolBucketTile) toolBucketTile.classList.toggle('active', activeTool==='bucket');
+  if (bucketHint) bucketHint.style.display = (activeTool==='bucket') ? 'block' : 'none';
+  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' ? 'crosshair' : (activeTool==='bucket' ? 'crosshair' : 'default'));
   cropBox.style.display = 'none';
 }
 toolMove.addEventListener('click', ()=> setTool('move'));
 toolCrop.addEventListener('click', ()=> setTool('crop'));
+if (toolCropTile) toolCropTile.addEventListener('click', ()=> setTool('crop'));
+if (toolBucketTile) toolBucketTile.addEventListener('click', ()=> setTool('bucket'));
+
+// ---------- Bucket fill ----------
+// Flood-fills a contiguous region on the ACTIVE layer only, matched against
+// that layer's own current pixels (not other layers, paper, or photo), then
+// stored as its own stroke entry so it replays, undoes, and exports exactly
+// like every other mark -- see drawStrokePoints' 'bucketfill' branch below.
+function performBucketFill(e){
+  const {x, y} = toCanvasXY(e);
+  const sx = Math.round(x), sy = Math.round(y);
+  if (sx<0 || sy<0 || sx>=baseW || sy>=baseH) return;
+
+  lsctx.clearRect(0,0,layerScratch.width,layerScratch.height);
+  for(const s of strokes){ if(s.layer===activeLayerId) drawStrokePoints(lsctx, s, 0); }
+  const imgData = lsctx.getImageData(0,0,baseW,baseH);
+  const data = imgData.data;
+
+  const idx0 = (sy*baseW+sx)*4;
+  const seedR=data[idx0], seedG=data[idx0+1], seedB=data[idx0+2], seedA=data[idx0+3];
+  const TOL = 32;
+  const tol2 = TOL*TOL*4;
+  function matches(i){
+    const dr=data[i]-seedR, dg=data[i+1]-seedG, db=data[i+2]-seedB, da=data[i+3]-seedA;
+    return (dr*dr+dg*dg+db*db+da*da) <= tol2;
+  }
+
+  const visited = new Uint8Array(baseW*baseH);
+  const stack = [[sx,sy]];
+  visited[sy*baseW+sx] = 1;
+  let minX=sx, minY=sy, maxX=sx, maxY=sy;
+  while(stack.length){
+    const [cx,cy] = stack.pop();
+    if (cx<minX) minX=cx; if (cx>maxX) maxX=cx;
+    if (cy<minY) minY=cy; if (cy>maxY) maxY=cy;
+    const neighbors = [[cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]];
+    for (const [nx,ny] of neighbors){
+      if (nx<0||ny<0||nx>=baseW||ny>=baseH) continue;
+      const vIdx = ny*baseW+nx;
+      if (visited[vIdx]) continue;
+      const i = vIdx*4;
+      if (!matches(i)) continue;
+      visited[vIdx] = 1;
+      stack.push([nx,ny]);
+    }
+  }
+
+  const w = maxX-minX+1, h = maxY-minY+1;
+  const fillCv = document.createElement('canvas'); fillCv.width=w; fillCv.height=h;
+  const fctx = fillCv.getContext('2d');
+  const fillImg = fctx.createImageData(w,h);
+  const [fr,fg,fb] = hexToRgbArr(color);
+  for (let yy=0; yy<h; yy++){
+    for (let xx=0; xx<w; xx++){
+      const gy = minY+yy, gx = minX+xx;
+      if (visited[gy*baseW+gx]){
+        const fi = (yy*w+xx)*4;
+        fillImg.data[fi]=fr; fillImg.data[fi+1]=fg; fillImg.data[fi+2]=fb; fillImg.data[fi+3]=255;
+      }
+    }
+  }
+  fctx.putImageData(fillImg, 0, 0);
+
+  strokes.push({ medium:'bucketfill', layer: activeLayerId, color, bx:minX, by:minY, dataUrl: fillCv.toDataURL('image/png') });
+  redrawLiveStrokes();
+}
+function drawBucketFillStroke(ctx, stroke){
+  if (!stroke._img){
+    const img = new Image();
+    img.onload = ()=>{ stroke._imgReady = true; redrawLiveStrokes(); };
+    img.src = stroke.dataUrl;
+    stroke._img = img;
+    return;
+  }
+  if (!stroke._imgReady) return;
+  ctx.drawImage(stroke._img, stroke.bx, stroke.by);
+}
 
 cv.addEventListener('pointerdown', e=>{
   if(activeTool==='move'){
@@ -635,6 +719,10 @@ cv.addEventListener('pointerdown', e=>{
     cropBox.style.left = cropStartPt.x+'px'; cropBox.style.top = cropStartPt.y+'px';
     cropBox.style.width = '0px'; cropBox.style.height = '0px';
     cropBox.style.display = 'block';
+    return;
+  }
+  if(activeTool==='bucket'){
+    performBucketFill(e);
     return;
   }
   cv.setPointerCapture(e.pointerId);
@@ -2051,7 +2139,10 @@ function saveProject(){
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
   };
   try{
-    localStorage.setItem(projectDataKey(activeProjectId), JSON.stringify(data));
+    // Strokes can carry transient, non-serializable caches (e.g. a bucket-fill
+    // stroke's loaded Image object in _img/_imgReady) -- strip any key starting
+    // with '_' so only the real stroke data is persisted.
+    localStorage.setItem(projectDataKey(activeProjectId), JSON.stringify(data, (k,v)=> (typeof k==='string' && k.startsWith('_')) ? undefined : v));
     const p = activeProject();
     if (p) { p.updatedAt = Date.now(); localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }
   }catch(e){ /* likely quota exceeded -- autosave is best-effort, give up quietly */ }

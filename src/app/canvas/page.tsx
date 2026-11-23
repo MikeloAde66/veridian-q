@@ -386,7 +386,10 @@ export default function DrawPage() {
           <div class="grid2">
             <button class="tile" data-medium="eraser" data-variant="soft">Eraser</button>
             <button class="tile" id="toolMagnify" type="button" title="Enlarge small UI text for readability">🔍 Magnify Text</button>
+            <button class="tile tool-icon" id="toolCropTile" type="button" title="Crop (drag a region, then Download/Copy it)">⬚ Crop</button>
+            <button class="tile tool-icon" id="toolBucketTile" type="button" title="Bucket Fill -- click an area on the active layer to flood-fill it with the current color">🪣 Bucket Fill</button>
           </div>
+          <div class="hint" id="bucketHint" style="display:none;padding:6px 2px 2px;">Click anywhere on the canvas to flood-fill that area on the active layer.</div>
         </details>
 
         <details class="menu-cat">
@@ -674,7 +677,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=26" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=27" strategy="afterInteractive" />
     </>
   );
 }
