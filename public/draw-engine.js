@@ -682,6 +682,7 @@ function showCropExport(sx,sy,sw,sh){
   octx.translate(-sx,-sy);
   octx.filter = adjustFilterString();
   fullRedraw(octx);
+  applyLightingPostProcess(off);
   const dataUrl = off.toDataURL('image/png');
   document.getElementById('exportImg').src = dataUrl;
   document.getElementById('exportMeta').textContent = `Crop — ${Math.round(sw)}×${Math.round(sh)}px`;
@@ -1161,6 +1162,7 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   octx.filter = adjustFilterString();
   fullRedraw(octx);
   octx.restore();
+  applyLightingPostProcess(off);
   if(bleed>0){
     const trimPx = bleed*dpi;
     octx.strokeStyle='#000'; octx.lineWidth=1;
@@ -1770,6 +1772,61 @@ const valueSlider = document.getElementById('valueSlider');
 const valueVal = document.getElementById('valueVal');
 const sharpenMatrix = document.getElementById('sharpenMatrix');
 
+// ---------- 3D Light: simulated raking light over painted texture ----------
+// Reads the painting's own luminance as a height map (lightingFx SVG filter,
+// defined in page.tsx) and relights it -- ridges (bright strokes / impasto
+// edges) catch a specular highlight, valleys (darker recesses) sit in
+// diffuse shadow. Same url(#filterId) mechanism the Sharpen slider already
+// uses, so it rides the existing stage.style.filter / octx.filter pipeline
+// and bakes into export for free, with no separate per-pixel pass needed.
+let light3D = false;
+let lightAngle = 235; // azimuth, degrees
+let lightDepth = 40;  // 0-100 -> surfaceScale (bump exaggeration)
+let lightShine = 30;  // 0-100 -> specularConstant (gloss strength)
+const light3DChk = document.getElementById('light3DChk');
+const lightAngleSlider = document.getElementById('lightAngle');
+const lightDepthSlider = document.getElementById('lightDepth');
+const lightShineSlider = document.getElementById('lightShine');
+const lightAngleVal = document.getElementById('lightAngleVal');
+const lightDepthVal = document.getElementById('lightDepthVal');
+const lightShineVal = document.getElementById('lightShineVal');
+const lightDiffuseEl = document.getElementById('lightDiffuse');
+const lightSpecularEl = document.getElementById('lightSpecular');
+const lightDistantD = document.getElementById('lightDistantD');
+const lightDistantS = document.getElementById('lightDistantS');
+function updateLightingFilterAttrs(){
+  if (!lightDiffuseEl || !lightSpecularEl) return;
+  const surfaceScale = (lightDepth/100) * 12;       // 0 - 12
+  const specularConstant = (lightShine/100) * 1.1;  // 0 - 1.1
+  lightDiffuseEl.setAttribute('surfaceScale', surfaceScale.toFixed(2));
+  lightSpecularEl.setAttribute('surfaceScale', surfaceScale.toFixed(2));
+  lightSpecularEl.setAttribute('specularConstant', specularConstant.toFixed(2));
+  if (lightDistantD) lightDistantD.setAttribute('azimuth', lightAngle);
+  if (lightDistantS) lightDistantS.setAttribute('azimuth', lightAngle);
+}
+if (light3DChk){
+  light3DChk.addEventListener('change', ()=>{
+    light3D = light3DChk.checked;
+    [lightAngleSlider, lightDepthSlider, lightShineSlider].forEach(sl=>{ if (sl) sl.disabled = !light3D; });
+    applyAdjustments();
+  });
+}
+if (lightAngleSlider) lightAngleSlider.addEventListener('input', ()=>{
+  lightAngle = Number(lightAngleSlider.value);
+  lightAngleVal.textContent = lightAngleSlider.value;
+  applyAdjustments();
+});
+if (lightDepthSlider) lightDepthSlider.addEventListener('input', ()=>{
+  lightDepth = Number(lightDepthSlider.value);
+  lightDepthVal.textContent = lightDepthSlider.value;
+  applyAdjustments();
+});
+if (lightShineSlider) lightShineSlider.addEventListener('input', ()=>{
+  lightShine = Number(lightShineSlider.value);
+  lightShineVal.textContent = lightShineSlider.value;
+  applyAdjustments();
+});
+
 function adjustFilterString(){
   const brightnessPct = valueAdjust * (1 + adj.shadow*0.002) * (1 + adj.highlight*0.001);
   const contrastPct = 100 * (1 - adj.shadow*0.0015) * (1 + adj.highlight*0.002) * (1 + adj.contrast*0.005);
@@ -1786,8 +1843,37 @@ function adjustFilterString(){
   }
   return f;
 }
+// 3D Light is deliberately NOT folded into adjustFilterString(). That string
+// gets set as ctx.filter on an offscreen context during export, where
+// fullRedraw() then makes many separate drawImage calls (paper, reference,
+// each layer...) -- an expensive SVG filter chain like feDiffuseLighting +
+// feSpecularLighting running on EVERY one of those calls instead of once at
+// the end turned a sub-second export into multiple minutes. It's applied
+// instead as (a) one extra term appended only for the live on-screen
+// stage.style.filter below, where it's a single CSS paint of one DOM layer
+// and cheap, and (b) a single final composite pass in applyLightingPostProcess()
+// for export, after the painting is fully rendered.
 function applyAdjustments(){
-  stage.style.filter = adjustFilterString();
+  let f = adjustFilterString();
+  if (light3D){
+    updateLightingFilterAttrs();
+    f += ' url(#lightingFx)';
+  }
+  stage.style.filter = f;
+}
+function applyLightingPostProcess(sourceCanvas){
+  if (!light3D) return;
+  updateLightingFilterAttrs();
+  const lit = document.createElement('canvas');
+  lit.width = sourceCanvas.width; lit.height = sourceCanvas.height;
+  const lctx = lit.getContext('2d');
+  lctx.filter = 'url(#lightingFx)';
+  lctx.drawImage(sourceCanvas, 0, 0);
+  const octx = sourceCanvas.getContext('2d');
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.filter = 'none';
+  octx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  octx.drawImage(lit, 0, 0);
 }
 valueSlider.addEventListener('input', ()=>{
   valueAdjust = Number(valueSlider.value);
@@ -1796,6 +1882,7 @@ valueSlider.addEventListener('input', ()=>{
 });
 document.querySelectorAll('.adj-slider').forEach(sl=>{
   const key = sl.id.replace('adj','').replace(/^./, c=>c.toLowerCase());
+  if (!(key in adj)) return; // skip the 3D Light sliders -- they have their own listeners above
   const out = document.getElementById(sl.id+'Val');
   sl.addEventListener('input', ()=>{
     adj[key] = Number(sl.value);
@@ -1809,6 +1896,12 @@ document.getElementById('adjResetBtn').addEventListener('click', ()=>{
     adj[k] = 0;
     const el = document.getElementById('adj'+k.charAt(0).toUpperCase()+k.slice(1));
     if(el){ el.value = 0; document.getElementById(el.id+'Val').textContent = 0; }
+  });
+  light3D = false; lightAngle = 235; lightDepth = 40; lightShine = 30;
+  if (light3DChk) light3DChk.checked = false;
+  [[lightAngleSlider, lightAngleVal, 235], [lightDepthSlider, lightDepthVal, 40], [lightShineSlider, lightShineVal, 30]].forEach(([sl, val, def])=>{
+    if (sl){ sl.value = def; sl.disabled = true; }
+    if (val) val.textContent = def;
   });
   stage.style.filter = '';
 });

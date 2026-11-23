@@ -236,6 +236,20 @@ export default function DrawPage() {
       <div dangerouslySetInnerHTML={{ __html: `<div id="app">
   <svg width="0" height="0" style="position:absolute;overflow:hidden;">
     <filter id="sharpenFx"><feConvolveMatrix id="sharpenMatrix" order="3" preserveAlpha="true" kernelMatrix="0 0 0 0 1 0 0 0 0"/></filter>
+    <filter id="lightingFx" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="luminanceToAlpha" result="lumA"/>
+      <feGaussianBlur in="lumA" stdDeviation="1.2" result="bump"/>
+      <feDiffuseLighting id="lightDiffuse" in="bump" surfaceScale="4" diffuseConstant="1" lighting-color="#ffffff" result="diffuse">
+        <feDistantLight id="lightDistantD" azimuth="235" elevation="55"/>
+      </feDiffuseLighting>
+      <feSpecularLighting id="lightSpecular" in="bump" surfaceScale="4" specularConstant="0.3" specularExponent="12" lighting-color="#ffffff" result="spec">
+        <feDistantLight id="lightDistantS" azimuth="235" elevation="55"/>
+      </feSpecularLighting>
+      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip"/>
+      <feBlend in="SourceGraphic" in2="diffuse" mode="multiply" result="shaded"/>
+      <feBlend in="shaded" in2="specClip" mode="screen" result="litBlend"/>
+      <feComposite in="litBlend" in2="SourceAlpha" operator="in"/>
+    </filter>
   </svg>
   <header>
     <div class="logo">VERIDIAN <b>Q</b></div>
@@ -445,6 +459,14 @@ export default function DrawPage() {
           <input type="range" class="adj-slider" id="adjCool" min="0" max="100" value="0">
           <label class="small adj-label">Sharp — <span id="adjSharpVal">0</span></label>
           <input type="range" class="adj-slider" id="adjSharp" min="0" max="100" value="0">
+          <label class="small" style="margin-top:10px;display:block;"><input type="checkbox" id="light3DChk" style="vertical-align:middle;margin-right:6px;">3D Light</label>
+          <div class="hint">Simulates raking light across your paint texture — ridges catch highlight, valleys catch shadow.</div>
+          <label class="small adj-label">Light Angle — <span id="lightAngleVal">235</span>°</label>
+          <input type="range" class="adj-slider" id="lightAngle" min="0" max="359" value="235" disabled>
+          <label class="small adj-label">Depth — <span id="lightDepthVal">40</span></label>
+          <input type="range" class="adj-slider" id="lightDepth" min="0" max="100" value="40" disabled>
+          <label class="small adj-label">Shine — <span id="lightShineVal">30</span></label>
+          <input type="range" class="adj-slider" id="lightShine" min="0" max="100" value="30" disabled>
           <button class="btn" id="adjResetBtn" style="margin-top:8px;">Reset Adjustments</button>
         </details>
 
@@ -633,7 +655,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=23" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=24" strategy="afterInteractive" />
     </>
   );
 }
