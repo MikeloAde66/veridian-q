@@ -44,6 +44,14 @@ export default function DrawPage() {
   aside.right.collapsed{width:60px;flex:0 0 60px;padding:14px 8px;overflow:hidden;}
   aside.right.collapsed #rightBody{display:none;}
   #rightToggle{margin-bottom:10px;}
+  /* Collapsed rail is 60px (44px usable after padding) -- "Settings ▾" at
+     12px/uppercase/letter-spacing needs close to 90px and was getting cut
+     off mid-word ("SETTI"), which is exactly what made Undo/Clear/Auto Paint
+     hard to find in the first place. Swap to a single gear glyph that always
+     fits; the full label comes back once the panel is expanded. */
+  .settings-label-short{display:none;}
+  aside.right.collapsed .settings-label-full{display:none;}
+  aside.right.collapsed .settings-label-short{display:inline;}
   h3.sec{font-size:12px;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin:16px 0 8px;}
   h3.sec:first-child{margin-top:0;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
@@ -415,7 +423,7 @@ export default function DrawPage() {
         <div id="refPanel" class="ref-panel open">
           <input type="file" id="refFileInput" accept="image/*" style="display:none;">
           <button class="btn" id="importRefBtn" style="width:auto;">Import</button>
-          <button class="btn" id="clearRefBtn" style="width:auto;">Clear</button>
+          <button class="btn" id="clearRefBtn" style="width:auto;" title="Removes the reference photo and any Auto Paint result -- your painted strokes are untouched">Clear Reference</button>
           <label class="small" style="margin:0;">Opacity — <span id="refOpVal">50</span>%</label>
           <input type="range" id="refOpacity" min="0" max="100" value="50" style="width:110px;">
           <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;">
@@ -451,7 +459,7 @@ export default function DrawPage() {
     </div>
 
     <aside class="right collapsed" id="rightAside">
-      <button class="btn" id="rightToggle">Settings ▾</button>
+      <button class="btn" id="rightToggle" title="Settings"><span class="settings-label-full">Settings ▾</span><span class="settings-label-short">⚙</span></button>
       <div id="rightBody">
       <label class="small">Pressure Sensitivity</label>
       <select id="pressureMode">
@@ -461,7 +469,7 @@ export default function DrawPage() {
 
       <div class="row" style="margin-top:14px;">
         <button class="btn" id="undoBtn">Undo</button>
-        <button class="btn" id="clearBtn">Clear</button>
+        <button class="btn" id="clearBtn" title="Erases every stroke on every layer -- this is the one that empties the canvas">Clear Canvas</button>
       </div>
 
       <h3 class="sec">Auto Paint</h3>
@@ -574,7 +582,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=15" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=16" strategy="afterInteractive" />
     </>
   );
 }
