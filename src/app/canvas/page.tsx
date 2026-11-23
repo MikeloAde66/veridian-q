@@ -424,6 +424,7 @@ export default function DrawPage() {
           <input type="file" id="refFileInput" accept="image/*" style="display:none;">
           <button class="btn" id="importRefBtn" style="width:auto;">Import</button>
           <button class="btn" id="clearRefBtn" style="width:auto;" title="Removes the reference photo and any Auto Paint result -- your painted strokes are untouched">Clear Reference</button>
+          <button class="btn" id="clearCanvasBtn" style="width:auto;" title="Erases every stroke on every layer -- cannot be undone">Clear Canvas</button>
           <label class="small" style="margin:0;">Opacity — <span id="refOpVal">50</span>%</label>
           <input type="range" id="refOpacity" min="0" max="100" value="50" style="width:110px;">
           <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;">
@@ -582,7 +583,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=16" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=17" strategy="afterInteractive" />
     </>
   );
 }

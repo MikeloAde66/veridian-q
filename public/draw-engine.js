@@ -925,7 +925,23 @@ document.getElementById('undoBtn').addEventListener('click', ()=>{ strokes.pop()
 // inconsistently. Strokes on any other layer survived a click (and so came
 // right back after a refresh, since they were never actually gone -- autosave
 // was accurately persisting them). Matches Undo's scope now: everything.
-document.getElementById('clearBtn').addEventListener('click', ()=>{ strokes = []; redrawLiveStrokes(); });
+// The settings-panel "Clear Canvas" button was the only way to wipe strokes,
+// and it's inside a collapsed-by-default aside that can also be scrolled --
+// easy to never find, which is exactly what kept happening (ghost strokes
+// from an earlier session read as "baked into the code somewhere" when they
+// were really just sitting in localStorage, with no visible way to clear
+// them). Added a second, always-visible "Clear Canvas" button on the main
+// toolbar next to "Clear Reference" -- same action, no hunting required.
+// Confirming before wiping now that it's one click away on the main toolbar
+// rather than buried: Undo only pops one stroke, so this is the one action
+// here with no way back.
+function clearCanvas(){
+  if (strokes.length && !window.confirm('Clear the entire canvas? This erases every stroke on every layer and cannot be undone.')) return;
+  strokes = [];
+  redrawLiveStrokes();
+}
+document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+document.getElementById('clearCanvasBtn').addEventListener('click', clearCanvas);
 
 // ---------- Layers: what you paint on. Export always flattens all of them. ----------
 const layersList = document.getElementById('layersList');
