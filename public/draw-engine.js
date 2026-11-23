@@ -1708,31 +1708,26 @@ function scheduleAutosave(){
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(saveProject, 600);
 }
-function saveProject(keepRefPhoto){
+// Deliberately NOT persisting the reference photo or Auto Paint result here
+// (even though earlier versions of this function did) -- this is a single
+// shared autosave slot for the whole browser/origin, with no concept of
+// separate projects or sessions. Every new tab or fresh visit to /canvas was
+// silently inheriting whatever photo happened to be saved last, which read
+// as "the link loaded with someone else's/an old reference -- that should be
+// blank" (it should, and now is). Your actual painted strokes and layers
+// still autosave and restore exactly as before; only the Reference panel
+// itself now always starts empty on a fresh load.
+function saveProject(){
   const data = {
     v: 1,
     strokes, layers, activeLayerId, nextLayerId,
     paperType, medium, variant, color, brushSize,
     activePigmentName,
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
-    ref: (refImg && refImg.src && refImg.style.display !== 'none' && keepRefPhoto !== false)
-      ? { src: refImg.src, opacity: refImg.style.opacity }
-      : null,
-    autoPaintResult: (autoPaintOverlay && autoPaintOverlay.src && autoPaintOverlay.style.display !== 'none' && keepRefPhoto !== false)
-      ? { src: autoPaintOverlay.src, opacity: autoPaintOverlay.style.opacity }
-      : null,
   };
   try{
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-  }catch(e){
-    // Likely quota exceeded (a large reference photo pushed it over) --
-    // retry without the photo so the painting itself still gets saved.
-    try{
-      data.ref = null;
-      data.autoPaintResult = null;
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-    }catch(e2){ /* give up quietly -- autosave is best-effort */ }
-  }
+  }catch(e){ /* likely quota exceeded -- autosave is best-effort, give up quietly */ }
 }
 function restoreProject(){
   let raw;
@@ -1751,26 +1746,8 @@ function restoreProject(){
   if(data.brushSize){ brushSize = data.brushSize; sizeSlider.value = brushSize; sizeVal.textContent = brushSize; }
   if(data.activePigmentName !== undefined) activePigmentName = data.activePigmentName;
   if(data.canvasSize && canvasSizeSel){ canvasSizeSel.value = data.canvasSize; renderRuler(); }
-  if(data.ref && data.ref.src){
-    refImg.src = data.ref.src;
-    refImg.style.display = 'block';
-    refImg.style.opacity = data.ref.opacity || 0.5;
-    if(refOpacity){
-      refOpacity.value = Math.round((parseFloat(data.ref.opacity)||0.5)*100);
-      refOpVal.textContent = refOpacity.value;
-    }
-  }
-  if(data.autoPaintResult && data.autoPaintResult.src){
-    autoPaintOverlay.src = data.autoPaintResult.src;
-    autoPaintOverlay.style.display = 'block';
-    autoPaintOverlay.style.opacity = data.autoPaintResult.opacity || 1;
-    if(refOpacity){
-      refOpacity.value = Math.round((parseFloat(data.autoPaintResult.opacity)||1)*100);
-      refOpVal.textContent = refOpacity.value;
-    }
-    const traceChk0 = document.getElementById('traceChk');
-    if(traceChk0){ traceChk0.checked = false; traceChk0.disabled = true; }
-  }
+  // Reference photo and Auto Paint result are intentionally never restored
+  // here -- see the comment on saveProject(). Reference always starts blank.
   renderLayersPanel();
   redrawLiveStrokes();
 }

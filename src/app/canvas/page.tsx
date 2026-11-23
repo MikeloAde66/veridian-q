@@ -583,7 +583,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=18" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=19" strategy="afterInteractive" />
     </>
   );
 }
