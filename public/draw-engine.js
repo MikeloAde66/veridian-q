@@ -1677,12 +1677,59 @@ document.querySelectorAll('.ruler-tile').forEach(btn=>{
     document.querySelectorAll('.ruler-tile').forEach(b=>b.classList.remove('active'));
     if(activeRuler) btn.classList.add('active');
     renderRuler();
+    if(!activeRuler) hideRulerReadout();
   });
 });
 gridUnitSel.addEventListener('change', renderRuler);
 perspectiveSel.addEventListener('change', renderRuler);
 canvasSizeSel.addEventListener('change', renderRuler);
 fibAngleSel.addEventListener('change', renderRuler);
+
+// ---------- ruler touch/cursor readout ----------
+// Pure overlay -- reads pointer position and shows it as real numbers
+// (inches/cm/mm for the measurement grid, inches along the horizon for the
+// perspective grid, percent of the canvas for Fibonacci). Never touches
+// strokes or layers, so there's zero risk to the actual painting; it's a
+// training aid for working a small area accurately and building a feel for
+// proportion and angle, the same way a real ruler laid on a canvas would be.
+const rulerReadout = document.getElementById('rulerReadout');
+function hideRulerReadout(){ rulerReadout.style.display = 'none'; }
+function updateRulerReadout(e){
+  if(!activeRuler){ hideRulerReadout(); return; }
+  const rect = cv.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  if(px<0 || py<0 || px>rect.width || py>rect.height){ hideRulerReadout(); return; }
+  const W = cv.width, H = cv.height;
+  const bx = px * (W/rect.width), by = py * (H/rect.height);
+  let text = '';
+  if(activeRuler==='grid1'){
+    const { wInches, hInches } = currentCanvasSizeInches();
+    const unit = gridUnitSel.value;
+    const unitInInches = unit==='in' ? 1 : (unit==='cm' ? 1/2.54 : 1/25.4);
+    const unitLabel = unit==='in' ? 'in' : unit;
+    const ux = (bx/W) * wInches / unitInInches;
+    const uy = (by/H) * hInches / unitInInches;
+    text = `${ux.toFixed(2)} ${unitLabel}  ·  ${uy.toFixed(2)} ${unitLabel}`;
+  } else if(activeRuler==='grid2'){
+    const { wInches } = currentCanvasSizeInches();
+    const ux = (bx/W) * wInches;
+    const horizonY = H*0.42;
+    const dyFromHorizon = (by - horizonY) / H * 100;
+    text = `${ux.toFixed(2)} in from left  ·  ${dyFromHorizon>=0?'+':''}${dyFromHorizon.toFixed(0)}% from horizon`;
+  } else if(activeRuler==='fibonacci'){
+    text = `${((bx/W)*100).toFixed(0)}%  ·  ${((by/H)*100).toFixed(0)}%`;
+  }
+  rulerReadout.textContent = text;
+  // Keep the label from running off the right/bottom edge of the canvas.
+  const offsetX = px > rect.width-160 ? -170 : 16;
+  const offsetY = py > rect.height-40 ? -32 : 16;
+  rulerReadout.style.left = (px+offsetX)+'px';
+  rulerReadout.style.top = (py+offsetY)+'px';
+  rulerReadout.style.display = 'block';
+}
+cv.addEventListener('pointermove', updateRulerReadout);
+cv.addEventListener('pointerdown', updateRulerReadout);
+cv.addEventListener('pointerleave', hideRulerReadout);
 
 // ---------- Adjust: global value + the 8 adjustment sliders ----------
 let valueAdjust = 100; // percent, 100 = neutral

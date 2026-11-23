@@ -197,6 +197,9 @@ export default function DrawPage() {
   #cropBox{position:absolute;left:0;top:0;width:0;height:0;border:2px dashed var(--gold);
     background:rgba(242,185,78,.12);display:none;pointer-events:none;}
   #rulerOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;}
+  #rulerReadout{position:absolute;left:0;top:0;pointer-events:none;background:rgba(10,8,5,.82);
+    color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 7px;
+    font-family:Georgia,serif;font-size:12px;font-weight:700;letter-spacing:.3px;white-space:nowrap;z-index:5;}
   #valueSlider{-webkit-appearance:none;appearance:none;width:100%;height:24px;border-radius:4px;
     background-image:linear-gradient(rgba(10,8,5,.52),rgba(10,8,5,.52)), url('/value-scale.png');
     background-size:cover;background-position:center;margin:4px 0 2px;}
@@ -461,6 +464,7 @@ export default function DrawPage() {
           <img id="autoPaintOverlay" alt="auto paint result" crossOrigin="anonymous">
           <canvas id="cv" width="1000" height="1300"></canvas>
           <div id="rulerOverlay"></div>
+          <div id="rulerReadout" style="display:none;"></div>
           <div id="cropBox"></div>
         </div>
       </div>
@@ -595,7 +599,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=20" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=21" strategy="afterInteractive" />
     </>
   );
 }
