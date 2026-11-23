@@ -921,6 +921,27 @@ buildPigmentRow('pigmentCoolRow', COOL_PIGMENTS);
 
 const grayscaleSlider = document.getElementById('grayscaleSlider');
 if (grayscaleSlider) {
+  // Paint the track as a real scale -- sampled from the same Mixbox white/
+  // black pigment mix the slider actually produces, in hard-edged segments
+  // like a printed paint-value chart, not a smooth generic CSS fade.
+  (function paintGrayscaleTrack(){
+    const STEPS = 10;
+    const stops = [];
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS;
+      const mixed = (typeof mixbox !== 'undefined')
+        ? mixbox.lerp(TITANIUM_WHITE, MARS_BLACK, t)
+        : TITANIUM_WHITE.map((c,idx)=> Math.round(c*(1-t) + MARS_BLACK[idx]*t));
+      stops.push(rgbToHex(mixed));
+    }
+    const segWidth = 100 / STEPS;
+    const parts = [];
+    for (let i = 0; i < STEPS; i++) {
+      const from = (i * segWidth).toFixed(2), to = ((i+1) * segWidth).toFixed(2);
+      parts.push(`${stops[i]} ${from}%`, `${stops[i]} ${to}%`);
+    }
+    grayscaleSlider.style.backgroundImage = `linear-gradient(to right, ${parts.join(', ')})`;
+  })();
   grayscaleSlider.addEventListener('input', ()=>{
     const t = Number(grayscaleSlider.value) / 100;
     const mixed = (typeof mixbox !== 'undefined')

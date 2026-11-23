@@ -60,13 +60,17 @@ export default function DrawPage() {
   .pigment-row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px;}
   .pigment-swatch{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);cursor:pointer;padding:0;}
   .pigment-swatch.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(242,185,78,.35) inset;}
-  .gray-slider{-webkit-appearance:none;appearance:none;width:100%;height:24px;border-radius:4px;margin:2px 0 6px;
+  /* IDs here, not .gray-slider -- the generic input[type=range] rule below
+     is an attribute selector, which outranks a plain class on specificity,
+     so a class-only rule silently lost to it (the real cause of the plain
+     blue native thumb/track reported here instead of the gold paint scale). */
+  #grayscaleSlider{-webkit-appearance:none;appearance:none;width:100%;height:24px;border-radius:4px;margin:2px 0 6px;
     background:linear-gradient(to right, #fff, #000);}
-  .gray-slider::-webkit-slider-runnable-track{height:24px;background:transparent;border-radius:4px;}
-  .gray-slider::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:30px;border-radius:3px;
+  #grayscaleSlider::-webkit-slider-runnable-track{height:24px;background:transparent;border-radius:4px;}
+  #grayscaleSlider::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:30px;border-radius:3px;
     background:var(--gold);border:1px solid #140f06;margin-top:-3px;cursor:pointer;box-shadow:0 0 6px rgba(242,185,78,.7);}
-  .gray-slider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
-  .gray-slider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
+  #grayscaleSlider::-moz-range-track{height:24px;background:transparent;border-radius:4px;}
+  #grayscaleSlider::-moz-range-thumb{width:10px;height:30px;border-radius:3px;background:var(--gold);border:1px solid #140f06;cursor:pointer;}
   button.tile{background:#1c1712;border:1px solid var(--line);color:var(--text);padding:10px 7px;
     font-size:12px;letter-spacing:.3px;cursor:pointer;border-radius:3px;text-transform:uppercase;}
   button.tile:hover{border-color:var(--gold-dim);}
@@ -254,13 +258,13 @@ export default function DrawPage() {
         <input type="range" id="sizeSlider" min="2" max="80" value="14">
         <div class="menu-sub" data-cat="paint" id="pigmentsPersistent">
           <h3 class="sec">Pigments</h3>
-          <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
+          <div class="hint" style="padding:0 2px 6px;">Analyze your palette to align with real paints.</div>
           <div class="pigment-row-label">Warm</div>
           <div class="pigment-row" id="pigmentWarmRow"></div>
           <div class="pigment-row-label">Cool</div>
           <div class="pigment-row" id="pigmentCoolRow"></div>
           <div class="pigment-row-label">Grayscale</div>
-          <input type="range" id="grayscaleSlider" class="gray-slider" min="0" max="100" value="50">
+          <input type="range" id="grayscaleSlider" min="0" max="100" value="50">
         </div>
       </div>
 
@@ -409,7 +413,6 @@ export default function DrawPage() {
           <summary>Adjust</summary>
           <label class="small" style="margin-top:4px;">Global Value — <span id="valueVal">100</span>%</label>
           <input type="range" id="valueSlider" min="50" max="150" value="100">
-          <div class="hint" style="padding:2px 2px 8px;">Shifts the whole piece lighter or darker — check this first, before you check anything else.</div>
           <label class="small adj-label">Contrast — <span id="adjContrastVal">0</span></label>
           <input type="range" class="adj-slider" id="adjContrast" min="-100" max="100" value="0">
           <label class="small adj-label">Tint — <span id="adjTintVal">0</span></label>
@@ -599,7 +602,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=21" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=22" strategy="afterInteractive" />
     </>
   );
 }
