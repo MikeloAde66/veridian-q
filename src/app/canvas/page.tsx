@@ -214,6 +214,7 @@ export default function DrawPage() {
   #selectBox.committed{background:rgba(92,179,255,.06);cursor:move;}
   #selGhost{position:absolute;left:0;top:0;width:0;height:0;display:none;pointer-events:none;
     outline:2px dashed #5cb3ff;opacity:.92;}
+  #lassoOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:none;}
   #rulerOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;}
   #rulerReadout{position:absolute;left:0;top:0;pointer-events:none;background:rgba(10,8,5,.82);
     color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 7px;
@@ -394,9 +395,16 @@ export default function DrawPage() {
             <button class="tile tool-icon" id="toolCropTile" type="button" title="Crop (drag a region, then Download/Copy it)">⬚ Crop</button>
             <button class="tile tool-icon" id="toolBucketTile" type="button" title="Bucket Fill -- click an area on the active layer to flood-fill it with the current color">🪣 Bucket Fill</button>
             <button class="tile tool-icon" id="toolRectSelectTile" type="button" title="Rectangular Select &amp; Move -- drag a region, then drag inside it to move those pixels">▭ Select &amp; Move</button>
+            <button class="tile tool-icon" id="toolLassoTile" type="button" title="Lasso Select &amp; Move -- draw a free-form outline, then drag inside it to move those pixels">➰ Lasso</button>
           </div>
           <div class="hint" id="bucketHint" style="display:none;padding:6px 2px 2px;">Click anywhere on the canvas to flood-fill that area on the active layer.</div>
           <div class="hint" id="rectSelectHint" style="display:none;padding:6px 2px 2px;">Drag a rectangle to select it, then drag inside the selection to move those pixels. Drag a new rectangle to start over.</div>
+          <div class="hint" id="lassoHint" style="display:none;padding:6px 2px 2px;">Draw a free-form outline to select it, then drag inside the selection to move those pixels. Draw a new outline to start over.</div>
+          <div class="grid2" style="margin-top:8px;">
+            <button class="tile" id="maskToggleBtn" type="button" disabled title="Mask to the current selection -- paint stays confined inside it until cleared">🧵 Mask Selection</button>
+            <button class="tile" id="maskClearBtn" type="button" disabled title="Remove the current paint mask">✕ Clear Mask</button>
+          </div>
+          <div class="hint" id="maskHint" style="display:none;padding:6px 2px 2px;">Mask is on -- new painting (brush, bucket fill) stays confined inside the masked area, like tape over the rest of the canvas.</div>
         </details>
 
         <details class="menu-cat">
@@ -519,6 +527,7 @@ export default function DrawPage() {
           <div id="cropBox"></div>
           <div id="selectBox"></div>
           <img id="selGhost" alt="" />
+          <canvas id="lassoOverlay"></canvas>
         </div>
       </div>
       <div class="zoom-bar">
@@ -686,7 +695,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=28" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=29" strategy="afterInteractive" />
     </>
   );
 }

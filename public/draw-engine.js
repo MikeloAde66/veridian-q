@@ -528,10 +528,29 @@ function stampAt(ctx, stroke, pt, idx){
 }
 
 // ---------- drawing a whole stroke / whole scene ----------
+// Runs fn() with ctx clipped to a closed canvas-space polygon (array of
+// {x,y}), or runs it unclipped if no usable path is given. Shared by live
+// drawing and stroke replay so a mask applies identically to both.
+function withClip(ctx, path, fn){
+  if (path && path.length >= 3){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x, path[i].y);
+    ctx.closePath();
+    ctx.clip();
+    fn();
+    ctx.restore();
+  } else {
+    fn();
+  }
+}
 function drawStrokePoints(ctx, stroke, fromIdx){
-  if (stroke.medium === 'bucketfill'){ drawBucketFillStroke(ctx, stroke); return; }
-  if (stroke.medium === 'moveselect'){ drawMoveSelectStroke(ctx, stroke); return; }
-  for(let i=fromIdx;i<stroke.points.length;i++) stampAt(ctx, stroke, stroke.points[i], i);
+  withClip(ctx, stroke.clipPath, ()=>{
+    if (stroke.medium === 'bucketfill'){ drawBucketFillStroke(ctx, stroke); }
+    else if (stroke.medium === 'moveselect'){ drawMoveSelectStroke(ctx, stroke); }
+    else { for(let i=fromIdx;i<stroke.points.length;i++) stampAt(ctx, stroke, stroke.points[i], i); }
+  });
 }
 const layerScratch = document.createElement('canvas');
 layerScratch.width = baseW; layerScratch.height = baseH;
@@ -606,7 +625,7 @@ function pressureFor(e, speed){
   return Math.max(0.15, 1-norm);
 }
 // ---------- Move & Crop tools ----------
-let activeTool = 'draw'; // 'draw' | 'move' | 'crop' | 'bucket' | 'rectselect'
+let activeTool = 'draw'; // 'draw' | 'move' | 'crop' | 'bucket' | 'rectselect' | 'lasso'
 let panning = false, panStart = null, panScroll = null;
 let cropping = false, cropStartPt = null;
 const toolMove = document.getElementById('toolMove');
@@ -616,6 +635,9 @@ const toolBucketTile = document.getElementById('toolBucketTile');
 const bucketHint = document.getElementById('bucketHint');
 const toolRectSelectTile = document.getElementById('toolRectSelectTile');
 const rectSelectHint = document.getElementById('rectSelectHint');
+const toolLassoTile = document.getElementById('toolLassoTile');
+const lassoHint = document.getElementById('lassoHint');
+const lassoOverlay = document.getElementById('lassoOverlay');
 const cropBox = document.getElementById('cropBox');
 function setTool(t){
   activeTool = (activeTool === t) ? 'draw' : t;
@@ -626,15 +648,19 @@ function setTool(t){
   if (bucketHint) bucketHint.style.display = (activeTool==='bucket') ? 'block' : 'none';
   if (toolRectSelectTile) toolRectSelectTile.classList.toggle('active', activeTool==='rectselect');
   if (rectSelectHint) rectSelectHint.style.display = (activeTool==='rectselect') ? 'block' : 'none';
-  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' || activeTool==='bucket' ? 'crosshair' : (activeTool==='rectselect' ? 'crosshair' : 'default'));
+  if (toolLassoTile) toolLassoTile.classList.toggle('active', activeTool==='lasso');
+  if (lassoHint) lassoHint.style.display = (activeTool==='lasso') ? 'block' : 'none';
+  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' || activeTool==='bucket' ? 'crosshair' : (activeTool==='rectselect' || activeTool==='lasso' ? 'crosshair' : 'default'));
   cropBox.style.display = 'none';
-  if (activeTool !== 'rectselect') clearSelection();
+  if (activeTool !== 'rectselect' && activeTool !== 'lasso') clearSelection();
+  if (lassoOverlay){ lassoOverlay.style.display = 'none'; const lctx = lassoOverlay.getContext('2d'); if (lctx) lctx.clearRect(0,0,lassoOverlay.width,lassoOverlay.height); }
 }
 toolMove.addEventListener('click', ()=> setTool('move'));
 toolCrop.addEventListener('click', ()=> setTool('crop'));
 if (toolCropTile) toolCropTile.addEventListener('click', ()=> setTool('crop'));
 if (toolBucketTile) toolBucketTile.addEventListener('click', ()=> setTool('bucket'));
 if (toolRectSelectTile) toolRectSelectTile.addEventListener('click', ()=> setTool('rectselect'));
+if (toolLassoTile) toolLassoTile.addEventListener('click', ()=> setTool('lasso'));
 
 // ---------- Bucket fill ----------
 // Flood-fills a contiguous region on the ACTIVE layer only, matched against
@@ -696,7 +722,7 @@ function performBucketFill(e){
   }
   fctx.putImageData(fillImg, 0, 0);
 
-  strokes.push({ medium:'bucketfill', layer: activeLayerId, color, bx:minX, by:minY, dataUrl: fillCv.toDataURL('image/png') });
+  strokes.push({ medium:'bucketfill', layer: activeLayerId, color, bx:minX, by:minY, clipPath: maskPath, dataUrl: fillCv.toDataURL('image/png') });
   redrawLiveStrokes();
 }
 function drawBucketFillStroke(ctx, stroke){
@@ -724,11 +750,66 @@ let selDragging = false, selDragStartScreen = null, selDragCurDx = 0, selDragCur
 let selCutDataUrl = null;
 const selectBox = document.getElementById('selectBox');
 const selGhost = document.getElementById('selGhost');
+
+// ---------- Lasso Select & Move ----------
+// Same two-step select-then-move interaction as rect-select, but the
+// selection shape is a free-form polygon traced during the drag instead of
+// an axis-aligned rectangle. The live outline draws on its own overlay
+// canvas (lassoOverlay) since a dashed-border <div> can't follow a
+// free-form path; finalizeLassoSelection() (below) hands off to the same
+// selection/move machinery rect-select uses once the drag ends.
+let lassoing = false, lassoPoints = null;
+function sizeLassoOverlay(){
+  if (!lassoOverlay) return;
+  const r = stage.getBoundingClientRect();
+  lassoOverlay.width = r.width; lassoOverlay.height = r.height;
+}
+function drawLassoPath(screenPts){
+  if (!lassoOverlay) return;
+  const lctx = lassoOverlay.getContext('2d');
+  lctx.clearRect(0,0,lassoOverlay.width,lassoOverlay.height);
+  if (screenPts.length < 2) return;
+  lctx.strokeStyle = '#5cb3ff';
+  lctx.lineWidth = 2;
+  lctx.setLineDash([6,4]);
+  lctx.beginPath();
+  lctx.moveTo(screenPts[0].x, screenPts[0].y);
+  for (let i=1;i<screenPts.length;i++) lctx.lineTo(screenPts[i].x, screenPts[i].y);
+  lctx.stroke();
+}
+
+// ---------- Mask ----------
+// A mask is a locked-in selection polygon that confines subsequent painting
+// (brush strokes, bucket fill) to its interior, like tape over the rest of
+// the canvas. Each stroke made while the mask is active carries a copy of
+// this polygon as its own clipPath (see withClip above), so it stays clipped
+// forever on replay even after the mask is later cleared -- only NEW strokes
+// are affected by turning the mask off.
+let maskPath = null;
+const maskToggleBtn = document.getElementById('maskToggleBtn');
+const maskClearBtn = document.getElementById('maskClearBtn');
+const maskHint = document.getElementById('maskHint');
+function updateMaskButtons(){
+  if (maskToggleBtn) maskToggleBtn.disabled = !selection;
+  if (maskClearBtn) maskClearBtn.disabled = !maskPath;
+  if (maskHint) maskHint.style.display = maskPath ? 'block' : 'none';
+}
+if (maskToggleBtn) maskToggleBtn.addEventListener('click', ()=>{
+  if (!selection) return;
+  maskPath = selection.path.map(p=>({x:p.x, y:p.y}));
+  clearSelection();
+});
+if (maskClearBtn) maskClearBtn.addEventListener('click', ()=>{
+  maskPath = null;
+  updateMaskButtons();
+});
+
 function clearSelection(){
   selection = null;
   selCutDataUrl = null;
   if (selectBox){ selectBox.style.display = 'none'; selectBox.classList.remove('committed'); }
   if (selGhost) selGhost.style.display = 'none';
+  updateMaskButtons();
 }
 function finalizeSelection(sx, sy, sw, sh){
   const x = Math.max(0, Math.round(sx)), y = Math.max(0, Math.round(sy));
@@ -738,14 +819,67 @@ function finalizeSelection(sx, sy, sw, sh){
   for(const s of strokes){ if(s.layer===activeLayerId) drawStrokePoints(lsctx, s, 0); }
   const cutCv = document.createElement('canvas'); cutCv.width=w; cutCv.height=h;
   cutCv.getContext('2d').drawImage(layerScratch, x, y, w, h, 0, 0, w, h);
-  selection = {x, y, w, h};
+  selection = {x, y, w, h, path:[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}]};
   selCutDataUrl = cutCv.toDataURL('image/png');
   selectBox.classList.add('committed');
+  updateMaskButtons();
+}
+// Same as finalizeSelection but for a free-form polygon (lasso) instead of an
+// axis-aligned rect -- the cut canvas is clipped to the polygon so pixels
+// outside it stay transparent, and the polygon itself becomes both the
+// selection's hole-punch shape (on move) and its eventual mask shape.
+function finalizeLassoSelection(points){
+  if (!points || points.length < 3) { clearSelection(); return; }
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (const p of points){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
+  const x = Math.max(0, Math.round(minX)), y = Math.max(0, Math.round(minY));
+  const w = Math.min(baseW - x, Math.round(maxX-minX)), h = Math.min(baseH - y, Math.round(maxY-minY));
+  if (w < 4 || h < 4){ clearSelection(); return; }
+  lsctx.clearRect(0,0,layerScratch.width,layerScratch.height);
+  for(const s of strokes){ if(s.layer===activeLayerId) drawStrokePoints(lsctx, s, 0); }
+  const cutCv = document.createElement('canvas'); cutCv.width=w; cutCv.height=h;
+  const cctx = cutCv.getContext('2d');
+  cctx.save();
+  cctx.beginPath();
+  cctx.moveTo(points[0].x-x, points[0].y-y);
+  for (let i=1;i<points.length;i++) cctx.lineTo(points[i].x-x, points[i].y-y);
+  cctx.closePath();
+  cctx.clip();
+  cctx.drawImage(layerScratch, x, y, w, h, 0, 0, w, h);
+  cctx.restore();
+  selection = {x, y, w, h, path: points.map(p=>({x:p.x, y:p.y}))};
+  selCutDataUrl = cutCv.toDataURL('image/png');
+  showSelectionBoxFromCanvasRect(x, y, w, h);
+  selectBox.classList.add('committed');
+  updateMaskButtons();
+}
+// Positions the (screen-space) selectBox div to match a canvas-space rect --
+// used after a lasso finalizes, since its live drag preview was drawn on the
+// separate lassoOverlay canvas rather than selectBox itself.
+function showSelectionBoxFromCanvasRect(x, y, w, h){
+  const rect = cv.getBoundingClientRect();
+  const stageRect = stage.getBoundingClientRect();
+  const scaleX = rect.width/cv.width, scaleY = rect.height/cv.height;
+  const left = (rect.left - stageRect.left) + x*scaleX;
+  const top = (rect.top - stageRect.top) + y*scaleY;
+  selectBox.style.left = left+'px';
+  selectBox.style.top = top+'px';
+  selectBox.style.width = (w*scaleX)+'px';
+  selectBox.style.height = (h*scaleY)+'px';
+  selectBox.style.display = 'block';
 }
 function drawMoveSelectStroke(ctx, stroke){
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillRect(stroke.bx, stroke.by, stroke.w, stroke.h);
+  if (stroke.path && stroke.path.length >= 3){
+    ctx.beginPath();
+    ctx.moveTo(stroke.path[0].x, stroke.path[0].y);
+    for (let i=1;i<stroke.path.length;i++) ctx.lineTo(stroke.path[i].x, stroke.path[i].y);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillRect(stroke.bx, stroke.by, stroke.w, stroke.h);
+  }
   ctx.restore();
   if (!stroke._img){
     const img = new Image();
@@ -779,7 +913,7 @@ cv.addEventListener('pointerdown', e=>{
     performBucketFill(e);
     return;
   }
-  if(activeTool==='rectselect'){
+  if(activeTool==='rectselect' || activeTool==='lasso'){
     if (selection && selectBox.style.display !== 'none'){
       const br = selectBox.getBoundingClientRect();
       if (e.clientX>=br.left && e.clientX<=br.right && e.clientY>=br.top && e.clientY<=br.bottom){
@@ -798,19 +932,28 @@ cv.addEventListener('pointerdown', e=>{
     }
     cv.setPointerCapture(e.pointerId);
     clearSelection();
-    selecting = true;
-    const rect = stage.getBoundingClientRect();
-    selectStartPt = {x:e.clientX-rect.left, y:e.clientY-rect.top};
-    selectBox.style.left = selectStartPt.x+'px'; selectBox.style.top = selectStartPt.y+'px';
-    selectBox.style.width = '0px'; selectBox.style.height = '0px';
-    selectBox.style.display = 'block';
+    if (activeTool==='rectselect'){
+      selecting = true;
+      const rect = stage.getBoundingClientRect();
+      selectStartPt = {x:e.clientX-rect.left, y:e.clientY-rect.top};
+      selectBox.style.left = selectStartPt.x+'px'; selectBox.style.top = selectStartPt.y+'px';
+      selectBox.style.width = '0px'; selectBox.style.height = '0px';
+      selectBox.style.display = 'block';
+    } else {
+      lassoing = true;
+      sizeLassoOverlay();
+      const rect = stage.getBoundingClientRect();
+      lassoPoints = [{x:e.clientX-rect.left, y:e.clientY-rect.top}];
+      lassoOverlay.style.display = 'block';
+      drawLassoPath(lassoPoints);
+    }
     return;
   }
   cv.setPointerCapture(e.pointerId);
   const {x,y} = toCanvasXY(e);
   const p = pressureFor(e,0);
-  current = {medium, variant, color, size:brushSize, layer:activeLayerId, points:[{x,y,p,j:makeJitter(6)}]};
-  stampAt(ctx, current, current.points[0], 0);
+  current = {medium, variant, color, size:brushSize, layer:activeLayerId, clipPath: maskPath, points:[{x,y,p,j:makeJitter(6)}]};
+  withClip(ctx, current.clipPath, ()=> stampAt(ctx, current, current.points[0], 0));
   lastPt = {x,y,t:performance.now()};
 });
 cv.addEventListener('pointermove', e=>{
@@ -843,6 +986,12 @@ cv.addEventListener('pointermove', e=>{
     selGhost.style.top = (baseTop + selDragCurDy) + 'px';
     return;
   }
+  if(lassoing){
+    const rect = stage.getBoundingClientRect();
+    lassoPoints.push({x:e.clientX-rect.left, y:e.clientY-rect.top});
+    drawLassoPath(lassoPoints);
+    return;
+  }
   if(!current) return;
   const {x,y} = toCanvasXY(e);
   const now = performance.now();
@@ -851,14 +1000,16 @@ cv.addEventListener('pointermove', e=>{
   const speed = dist/dt*16;
   const spacing = Math.max(2, current.size*0.22);
   const steps = Math.max(1, Math.floor(dist/spacing));
-  for(let i=1;i<=steps;i++){
-    const t=i/steps;
-    const px=lastPt.x+(x-lastPt.x)*t, py=lastPt.y+(y-lastPt.y)*t;
-    const p = pressureFor(e,speed);
-    const pt = {x:px,y:py,p,j:makeJitter(6)};
-    current.points.push(pt);
-    stampAt(ctx, current, pt, current.points.length-1);
-  }
+  withClip(ctx, current.clipPath, ()=>{
+    for(let i=1;i<=steps;i++){
+      const t=i/steps;
+      const px=lastPt.x+(x-lastPt.x)*t, py=lastPt.y+(y-lastPt.y)*t;
+      const p = pressureFor(e,speed);
+      const pt = {x:px,y:py,p,j:makeJitter(6)};
+      current.points.push(pt);
+      stampAt(ctx, current, pt, current.points.length-1);
+    }
+  });
   lastPt = {x,y,t:now};
 });
 function showCropExport(sx,sy,sw,sh){
@@ -898,6 +1049,19 @@ function endStroke(){
     else { clearSelection(); }
     return;
   }
+  if(lassoing){
+    lassoing = false;
+    lassoOverlay.style.display = 'none';
+    const lctx = lassoOverlay.getContext('2d');
+    if (lctx) lctx.clearRect(0,0,lassoOverlay.width,lassoOverlay.height);
+    const cvRect = cv.getBoundingClientRect(), stageRect = stage.getBoundingClientRect();
+    const scaleX = cv.width/cvRect.width, scaleY = cv.height/cvRect.height;
+    const offX = cvRect.left - stageRect.left, offY = cvRect.top - stageRect.top;
+    const canvasPts = lassoPoints.map(p=> ({x:(p.x-offX)*scaleX, y:(p.y-offY)*scaleY}));
+    finalizeLassoSelection(canvasPts);
+    lassoPoints = null;
+    return;
+  }
   if(selDragging){
     selDragging = false;
     selGhost.style.display = 'none';
@@ -905,7 +1069,7 @@ function endStroke(){
     const scaleX = cv.width/rect.width, scaleY = cv.height/rect.height;
     const canvasDx = Math.round(selDragCurDx * scaleX), canvasDy = Math.round(selDragCurDy * scaleY);
     if (selection && (Math.abs(canvasDx) > 1 || Math.abs(canvasDy) > 1)){
-      strokes.push({ medium:'moveselect', layer: activeLayerId, bx: selection.x, by: selection.y, w: selection.w, h: selection.h, dx: canvasDx, dy: canvasDy, dataUrl: selCutDataUrl });
+      strokes.push({ medium:'moveselect', layer: activeLayerId, bx: selection.x, by: selection.y, w: selection.w, h: selection.h, path: selection.path, dx: canvasDx, dy: canvasDy, dataUrl: selCutDataUrl });
       redrawLiveStrokes();
     }
     clearSelection();
