@@ -833,8 +833,19 @@ PALETTE.forEach(c=>{
 // A small personal palette, separate from the fixed PALETTE above and from
 // the Mixbox pigment library below -- a place to bank an exact mixed color
 // (including one dialed in via the pigment/grayscale mixer) and get back to
-// it later without re-mixing. Persisted via autosave like everything else.
+// it later without re-mixing. Global to the artist, not per-project -- a
+// palette you've built up is useful on every piece, so switching projects
+// (see Projects, further down) never touches it. Has its own storage key
+// rather than riding along with project autosave.
+const SAVED_COLORS_KEY = 'vq-saved-colors-v1';
 let savedColors = [];
+try{
+  const raw = localStorage.getItem(SAVED_COLORS_KEY);
+  if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) savedColors = parsed; }
+}catch(e){ /* best-effort */ }
+function persistSavedColors(){
+  try{ localStorage.setItem(SAVED_COLORS_KEY, JSON.stringify(savedColors)); }catch(e){ /* best-effort */ }
+}
 const savedColorsRow = document.getElementById('savedColorsRow');
 function renderSavedColors(){
   savedColorsRow.innerHTML = '';
@@ -847,14 +858,14 @@ function renderSavedColors(){
       d.classList.add('active'); });
     const rm = document.createElement('button'); rm.className = 'saved-color-remove'; rm.type = 'button';
     rm.title = 'Remove from saved colors'; rm.textContent = '×';
-    rm.addEventListener('click', (e)=>{ e.stopPropagation(); savedColors.splice(i, 1); renderSavedColors(); scheduleAutosave(); });
+    rm.addEventListener('click', (e)=>{ e.stopPropagation(); savedColors.splice(i, 1); renderSavedColors(); persistSavedColors(); });
     wrap.appendChild(d); wrap.appendChild(rm);
     savedColorsRow.appendChild(wrap);
   });
 }
 document.getElementById('saveColorBtn').addEventListener('click', ()=>{
   const hex = colorPicker.value;
-  if (!savedColors.includes(hex)) { savedColors.push(hex); renderSavedColors(); scheduleAutosave(); }
+  if (!savedColors.includes(hex)) { savedColors.push(hex); renderSavedColors(); persistSavedColors(); }
 });
 renderSavedColors();
 
@@ -1802,37 +1813,160 @@ document.getElementById('adjResetBtn').addEventListener('click', ()=>{
   stage.style.filter = '';
 });
 
-// ---------- Autosave: keeps your work in this browser across reloads ----------
-const AUTOSAVE_KEY = 'vq-autosave-v1';
+// ---------- Projects: separate named canvases, each with its own autosave ----------
+// Still local-only (no backend/auth yet) -- a "project" is just its own
+// autosave slot plus a name/description in a small registry, so more than
+// one piece can be going at once without one overwriting another.
+const LEGACY_AUTOSAVE_KEY = 'vq-autosave-v1'; // the old single-slot key, pre-Projects
+const PROJECTS_KEY = 'vq-projects-v1';
+const ACTIVE_PROJECT_KEY = 'vq-active-project-v1';
+function projectDataKey(id){ return 'vq-project-data-v1:' + id; }
+function makeProjectId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+let projects = [];
+let activeProjectId = null;
+
+// Sets up the registry the first time this feature runs. Critical: if
+// someone already has real work saved under the old single autosave slot,
+// it must become a named project, not silently vanish.
+function ensureProjectsInitialized(){
+  let raw;
+  try{ raw = localStorage.getItem(PROJECTS_KEY); }catch(e){ raw = null; }
+  let existing = null;
+  try{ existing = raw ? JSON.parse(raw) : null; }catch(e){ existing = null; }
+  if (Array.isArray(existing) && existing.length){
+    projects = existing;
+    let active;
+    try{ active = localStorage.getItem(ACTIVE_PROJECT_KEY); }catch(e){ active = null; }
+    activeProjectId = (active && projects.some(p=>p.id===active)) ? active : projects[0].id;
+    return;
+  }
+  const now = Date.now();
+  const id = makeProjectId();
+  let legacyRaw;
+  try{ legacyRaw = localStorage.getItem(LEGACY_AUTOSAVE_KEY); }catch(e){ legacyRaw = null; }
+  if (legacyRaw){
+    projects = [{ id, name: 'My First Project', description: '', createdAt: now, updatedAt: now }];
+    try{ localStorage.setItem(projectDataKey(id), legacyRaw); }catch(e){ /* best-effort */ } // carries real saved work over as-is
+  } else {
+    projects = [{ id, name: 'Untitled Project', description: '', createdAt: now, updatedAt: now }];
+  }
+  activeProjectId = id;
+  try{
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    localStorage.setItem(ACTIVE_PROJECT_KEY, activeProjectId);
+  }catch(e){ /* best-effort */ }
+}
+function activeProject(){ return projects.find(p=>p.id===activeProjectId) || null; }
+
+const projectSwitcher = document.getElementById('projectSwitcher');
+const activeProjectDesc = document.getElementById('activeProjectDesc');
+function renderProjectSwitcher(){
+  projectSwitcher.innerHTML = '';
+  projects.forEach(p=>{
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    if (p.id === activeProjectId) opt.selected = true;
+    projectSwitcher.appendChild(opt);
+  });
+  const p = activeProject();
+  const hasDesc = !!(p && p.description);
+  activeProjectDesc.textContent = hasDesc ? p.description : '';
+  activeProjectDesc.style.display = hasDesc ? '' : 'none';
+}
+projectSwitcher.addEventListener('change', ()=>{
+  if (projectSwitcher.value && projectSwitcher.value !== activeProjectId) switchToProject(projectSwitcher.value);
+});
+
+// Resets every piece of in-memory canvas state to a blank starting point --
+// used only when opening a brand-new project. An ordinary reload never
+// calls this; restoreProject() below handles that case by loading the
+// active project's own saved data instead.
+function resetCanvasStateToBlank(){
+  strokes = [];
+  layers = [{ id: 1, name: 'Layer 1', visible: true, opacity: 1 }];
+  activeLayerId = 1; nextLayerId = 2;
+  medium = 'graphite'; variant = 'hb';
+  color = '#1a1a1a'; colorPicker.value = color; activePigmentName = null;
+  brushSize = 14; sizeSlider.value = brushSize; sizeVal.textContent = brushSize;
+  paperType = 'paynesgrey'; surfaceSel.value = paperType; updateSurfacePreview();
+  if (canvasSizeSel) { canvasSizeSel.value = '8x10'; renderRuler(); }
+  const adjResetBtn = document.getElementById('adjResetBtn');
+  if (adjResetBtn) adjResetBtn.click();
+  refImg.style.display = 'none'; refImg.src = '';
+  autoPaintOverlay.style.display = 'none'; autoPaintOverlay.src = '';
+  const traceChk0 = document.getElementById('traceChk');
+  if (traceChk0) { traceChk0.checked = false; traceChk0.disabled = false; }
+  paperCv.style.opacity = 1;
+  hidePaletteAnalysis();
+}
+
+function switchToProject(id){
+  if (!projects.some(p=>p.id===id) || id === activeProjectId) return;
+  saveProject(); // flush whatever was just being worked on before leaving it
+  activeProjectId = id;
+  try{ localStorage.setItem(ACTIVE_PROJECT_KEY, activeProjectId); }catch(e){ /* best-effort */ }
+  resetCanvasStateToBlank();
+  restoreProject();
+  renderProjectSwitcher();
+  renderLayersPanel();
+  redrawLiveStrokes();
+}
+
+const projectModal = document.getElementById('projectModal');
+const newProjectName = document.getElementById('newProjectName');
+const newProjectDesc = document.getElementById('newProjectDesc');
+const projectModalError = document.getElementById('projectModalError');
+function openProjectModal(){
+  newProjectName.value = ''; newProjectDesc.value = '';
+  projectModalError.style.display = 'none';
+  projectModal.classList.add('open');
+  setTimeout(()=> newProjectName.focus(), 0);
+}
+function closeProjectModal(){ projectModal.classList.remove('open'); }
+document.getElementById('addProjectBtn').addEventListener('click', openProjectModal);
+document.getElementById('cancelProjectBtn').addEventListener('click', closeProjectModal);
+document.getElementById('confirmAddProjectBtn').addEventListener('click', ()=>{
+  const name = newProjectName.value.trim();
+  if (!name){ projectModalError.textContent = 'Give the project a name.'; projectModalError.style.display = ''; return; }
+  const now = Date.now();
+  const id = makeProjectId();
+  projects.push({ id, name, description: newProjectDesc.value.trim(), createdAt: now, updatedAt: now });
+  try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ /* best-effort */ }
+  closeProjectModal();
+  switchToProject(id);
+});
+
+// ---------- Autosave: keeps the active project's work in this browser across reloads ----------
 let autosaveTimer = null;
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(saveProject, 600);
 }
 // Deliberately NOT persisting the reference photo or Auto Paint result here
-// (even though earlier versions of this function did) -- this is a single
-// shared autosave slot for the whole browser/origin, with no concept of
-// separate projects or sessions. Every new tab or fresh visit to /canvas was
-// silently inheriting whatever photo happened to be saved last, which read
-// as "the link loaded with someone else's/an old reference -- that should be
-// blank" (it should, and now is). Your actual painted strokes and layers
-// still autosave and restore exactly as before; only the Reference panel
-// itself now always starts empty on a fresh load.
+// -- this used to be a single shared autosave slot for the whole browser/
+// origin; now each project gets its own slot (projectDataKey above), but a
+// photo loaded mid-session still shouldn't silently reappear on the next
+// visit to the same project, so it stays excluded from what's saved.
 function saveProject(){
+  if (!activeProjectId) return;
   const data = {
     v: 1,
     strokes, layers, activeLayerId, nextLayerId,
     paperType, medium, variant, color, brushSize,
-    activePigmentName, savedColors,
+    activePigmentName,
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
   };
   try{
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+    localStorage.setItem(projectDataKey(activeProjectId), JSON.stringify(data));
+    const p = activeProject();
+    if (p) { p.updatedAt = Date.now(); localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }
   }catch(e){ /* likely quota exceeded -- autosave is best-effort, give up quietly */ }
 }
 function restoreProject(){
+  if (!activeProjectId) return;
   let raw;
-  try{ raw = localStorage.getItem(AUTOSAVE_KEY); }catch(e){ return; }
+  try{ raw = localStorage.getItem(projectDataKey(activeProjectId)); }catch(e){ return; }
   if(!raw) return;
   let data;
   try{ data = JSON.parse(raw); }catch(e){ return; }
@@ -1842,7 +1976,6 @@ function restoreProject(){
   if(data.activeLayerId != null) activeLayerId = data.activeLayerId;
   nextLayerId = data.nextLayerId != null ? data.nextLayerId : (Math.max(0, ...layers.map(l=>l.id)) + 1);
   if(data.paperType){ paperType = data.paperType; surfaceSel.value = paperType; updateSurfacePreview(); }
-  if(Array.isArray(data.savedColors)){ savedColors = data.savedColors; renderSavedColors(); }
   if(data.medium){ medium = data.medium; variant = data.variant; }
   if(data.color){ color = data.color; colorPicker.value = color; }
   if(data.brushSize){ brushSize = data.brushSize; sizeSlider.value = brushSize; sizeVal.textContent = brushSize; }
@@ -1853,6 +1986,8 @@ function restoreProject(){
   renderLayersPanel();
   redrawLiveStrokes();
 }
+ensureProjectsInitialized();
+renderProjectSwitcher();
 restoreProject();
 window.addEventListener('beforeunload', ()=>saveProject());
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveProject(); });

@@ -154,6 +154,15 @@ export default function DrawPage() {
   #exportOverlay img{max-width:90vw;max-height:70vh;border:1px solid var(--line);background:#fff;}
   #exportOverlay .panel{margin-top:14px;text-align:center;max-width:520px;}
   #exportOverlay .btn{display:inline-block;width:auto;padding:10px 20px;margin:4px;}
+  .project-cat-row{display:flex;align-items:flex-start;gap:6px;}
+  .project-cat-row details.menu-cat{flex:1;min-width:0;}
+  .project-cat-row>.icon-btn{margin-top:4px;font-size:18px;line-height:1;}
+  .project-active-row{margin:6px 0 4px;}
+  #projectSwitcher{margin:0;}
+  #projectModal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:60;padding:20px;}
+  #projectModal.open{display:flex;}
+  .project-modal-card{background:#13100b;border:1px solid var(--line);border-radius:6px;padding:20px;max-width:420px;width:100%;}
+  .project-modal-card label.small{display:block;margin-bottom:4px;}
   aside.left{padding:10px 8px;}
   .edit-rail{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line);}
   .icon-btn{width:30px;height:30px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;
@@ -271,14 +280,21 @@ export default function DrawPage() {
       <div class="texture-box" id="textureBox"><div class="surface-preview" id="surfacePreview"></div><select id="surfaceSel"></select></div>
 
       <div class="menu-panel open" id="menuPanel">
-        <details class="menu-cat" open>
-          <summary>Project</summary>
-          <div class="grid3" id="projectModeGrid">
-            <button class="tile" data-mode="paint">Paint</button>
-            <button class="tile" data-mode="drawing">Drawing</button>
-            <button class="tile" data-mode="mixed">Mixed Media</button>
-          </div>
-        </details>
+        <div class="project-cat-row">
+          <details class="menu-cat" open>
+            <summary>Project</summary>
+            <div class="project-active-row">
+              <select id="projectSwitcher" title="Switch to a different project"></select>
+            </div>
+            <div class="hint" id="activeProjectDesc" style="padding:0 2px 6px;"></div>
+            <div class="grid3" id="projectModeGrid">
+              <button class="tile" data-mode="paint">Paint</button>
+              <button class="tile" data-mode="drawing">Drawing</button>
+              <button class="tile" data-mode="mixed">Mixed Media</button>
+            </div>
+          </details>
+          <button class="icon-btn" id="addProjectBtn" type="button" title="Add new project">+</button>
+        </div>
         <details class="menu-cat">
           <summary>Brushes</summary>
           <details class="menu-sub" data-cat="drawing">
@@ -600,9 +616,24 @@ export default function DrawPage() {
       <button class="btn" id="closeExportBtn" style="width:auto;">Close</button>
     </div>
   </div>
+</div>
+
+<div id="projectModal">
+  <div class="project-modal-card">
+    <h3 class="sec" style="margin-top:0;">New Project</h3>
+    <label class="small">Project Name</label>
+    <input type="text" id="newProjectName" placeholder="e.g. Portrait Study" maxlength="80">
+    <label class="small" style="margin-top:10px;">Description (optional)</label>
+    <textarea id="newProjectDesc" rows="3" placeholder="What is this project?" style="width:100%;background:#1c1712;border:1px solid var(--line);color:var(--text);padding:7px;border-radius:3px;font-size:14px;resize:vertical;"></textarea>
+    <div class="hint" id="projectModalError" style="color:#e07a5f;display:none;padding:6px 0 0;"></div>
+    <div style="margin-top:14px;text-align:right;">
+      <button class="btn" id="cancelProjectBtn" style="width:auto;">Cancel</button>
+      <button class="btn primary" id="confirmAddProjectBtn" style="width:auto;">Add Project</button>
+    </div>
+  </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=22" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=23" strategy="afterInteractive" />
     </>
   );
 }
