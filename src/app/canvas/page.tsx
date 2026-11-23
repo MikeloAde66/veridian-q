@@ -85,6 +85,13 @@ export default function DrawPage() {
   .swatches{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
   .swatch{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);cursor:pointer;}
   .swatch.active{border-color:var(--gold);}
+  .saved-colors-head{display:flex;align-items:center;justify-content:space-between;margin-top:12px;}
+  .saved-colors-head .icon-btn{width:22px;height:22px;flex:0 0 22px;font-size:15px;line-height:1;padding:0;}
+  .saved-colors-row{min-height:24px;}
+  .saved-color-swatch{position:relative;}
+  .saved-color-remove{position:absolute;top:-6px;right:-6px;width:14px;height:14px;border-radius:50%;
+    background:#1c1712;border:1px solid var(--line);color:var(--text-dim);font-size:9px;line-height:12px;
+    text-align:center;cursor:pointer;padding:0;}
   .row{display:flex;gap:8px;align-items:center;}
   .row>*{flex:1;}
   .btn{background:#1c1712;border:1px solid var(--gold-dim);color:var(--gold);padding:10px;border-radius:3px;
@@ -234,9 +241,24 @@ export default function DrawPage() {
         <h3 class="sec">Color</h3>
         <input type="color" id="colorPicker" value="#1a1a1a">
         <div class="swatches" id="swatches"></div>
+        <div class="saved-colors-head">
+          <span class="small" style="margin:0;">Saved</span>
+          <button class="icon-btn" id="saveColorBtn" type="button" title="Save the current color to your palette">+</button>
+        </div>
+        <div class="swatches saved-colors-row" id="savedColorsRow"></div>
         <h3 class="sec">Brush Size</h3>
         <label class="small">Size — <span id="sizeVal">14</span>px</label>
         <input type="range" id="sizeSlider" min="2" max="80" value="14">
+        <div class="menu-sub" data-cat="paint" id="pigmentsPersistent">
+          <h3 class="sec">Pigments</h3>
+          <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
+          <div class="pigment-row-label">Warm</div>
+          <div class="pigment-row" id="pigmentWarmRow"></div>
+          <div class="pigment-row-label">Cool</div>
+          <div class="pigment-row" id="pigmentCoolRow"></div>
+          <div class="pigment-row-label">Grayscale</div>
+          <input type="range" id="grayscaleSlider" class="gray-slider" min="0" max="100" value="50">
+        </div>
       </div>
 
       <div class="texture-box" id="textureBox"><div class="surface-preview" id="surfacePreview"></div><select id="surfaceSel"></select></div>
@@ -319,16 +341,6 @@ export default function DrawPage() {
               <button class="tile" data-medium="surface" data-variant="hard">Hard Blend</button>
             </div>
             <div class="hint" style="padding:0 2px 8px;">Both drag the paint that's already there -- neither adds new color. Smooth softens and feathers it as it drags; Hard carries it across with much less softening, for a firmer, more solid smear.</div>
-          </details>
-          <details class="menu-sub" data-cat="paint">
-            <summary>Pigments</summary>
-            <div class="hint" style="padding:0 2px 6px;">Mixed the way real paint mixes, not a flat color blend -- pick a pigment below.</div>
-            <div class="pigment-row-label">Warm</div>
-            <div class="pigment-row" id="pigmentWarmRow"></div>
-            <div class="pigment-row-label">Cool</div>
-            <div class="pigment-row" id="pigmentCoolRow"></div>
-            <div class="pigment-row-label">Grayscale</div>
-            <input type="range" id="grayscaleSlider" class="gray-slider" min="0" max="100" value="50">
           </details>
         </details>
 
@@ -583,7 +595,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=19" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=20" strategy="afterInteractive" />
     </>
   );
 }

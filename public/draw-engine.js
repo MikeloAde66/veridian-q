@@ -722,11 +722,15 @@ document.querySelector('.tile[data-medium="graphite"][data-variant="hb"]').class
 // Filters the Brushes menu down to what's relevant for the kind of work
 // someone's doing, via each brush sub-category's data-cat attribute.
 // 'mixed' (the default) shows everything, same as before this existed.
+// Selector is `.menu-sub[data-cat]` (not `details.menu-sub[data-cat]`) because
+// Pigments moved out of the collapsible Brushes menu into the always-visible
+// Color panel as a plain <div class="menu-sub" data-cat="paint">, so it still
+// needs to hide itself in Drawing mode exactly like the brush sub-menus do.
 let projectMode = localStorage.getItem('vq-project-mode') || 'mixed';
 function applyProjectMode(){
   document.querySelectorAll('.tile[data-mode]').forEach(b=>
     b.classList.toggle('active', b.dataset.mode === projectMode));
-  document.querySelectorAll('details.menu-sub[data-cat]').forEach(sub=>{
+  document.querySelectorAll('.menu-sub[data-cat]').forEach(sub=>{
     const show = projectMode === 'mixed' || sub.dataset.cat === projectMode;
     sub.style.display = show ? '' : 'none';
   });
@@ -824,6 +828,35 @@ PALETTE.forEach(c=>{
     document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); d.classList.add('active'); });
   swEl.appendChild(d);
 });
+
+// ---------- saved colors ("store color paints") ----------
+// A small personal palette, separate from the fixed PALETTE above and from
+// the Mixbox pigment library below -- a place to bank an exact mixed color
+// (including one dialed in via the pigment/grayscale mixer) and get back to
+// it later without re-mixing. Persisted via autosave like everything else.
+let savedColors = [];
+const savedColorsRow = document.getElementById('savedColorsRow');
+function renderSavedColors(){
+  savedColorsRow.innerHTML = '';
+  savedColors.forEach((c, i)=>{
+    const wrap = document.createElement('div'); wrap.className = 'saved-color-swatch';
+    const d = document.createElement('div'); d.className = 'swatch'; d.style.background = c;
+    d.title = c;
+    d.addEventListener('click', ()=>{ color = c; colorPicker.value = c; activePigmentName = null;
+      document.querySelectorAll('.swatch, .pigment-swatch').forEach(s=>s.classList.remove('active'));
+      d.classList.add('active'); });
+    const rm = document.createElement('button'); rm.className = 'saved-color-remove'; rm.type = 'button';
+    rm.title = 'Remove from saved colors'; rm.textContent = '×';
+    rm.addEventListener('click', (e)=>{ e.stopPropagation(); savedColors.splice(i, 1); renderSavedColors(); scheduleAutosave(); });
+    wrap.appendChild(d); wrap.appendChild(rm);
+    savedColorsRow.appendChild(wrap);
+  });
+}
+document.getElementById('saveColorBtn').addEventListener('click', ()=>{
+  const hex = colorPicker.value;
+  if (!savedColors.includes(hex)) { savedColors.push(hex); renderSavedColors(); scheduleAutosave(); }
+});
+renderSavedColors();
 
 // ---------- pigments (real paint names, Kubelka-Munk mixing via Mixbox) ----------
 // Mixbox (window.mixbox, loaded as /vendor/mixbox.js) models how actual pigments
@@ -1722,7 +1755,7 @@ function saveProject(){
     v: 1,
     strokes, layers, activeLayerId, nextLayerId,
     paperType, medium, variant, color, brushSize,
-    activePigmentName,
+    activePigmentName, savedColors,
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
   };
   try{
@@ -1741,6 +1774,7 @@ function restoreProject(){
   if(data.activeLayerId != null) activeLayerId = data.activeLayerId;
   nextLayerId = data.nextLayerId != null ? data.nextLayerId : (Math.max(0, ...layers.map(l=>l.id)) + 1);
   if(data.paperType){ paperType = data.paperType; surfaceSel.value = paperType; updateSurfacePreview(); }
+  if(Array.isArray(data.savedColors)){ savedColors = data.savedColors; renderSavedColors(); }
   if(data.medium){ medium = data.medium; variant = data.variant; }
   if(data.color){ color = data.color; colorPicker.value = color; }
   if(data.brushSize){ brushSize = data.brushSize; sizeSlider.value = brushSize; sizeVal.textContent = brushSize; }
