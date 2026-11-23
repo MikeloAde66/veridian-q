@@ -1019,7 +1019,14 @@ function showCropExport(sx,sy,sw,sh){
   octx.filter = adjustFilterString();
   fullRedraw(octx);
   applyLightingPostProcess(off);
-  const dataUrl = off.toDataURL('image/png');
+  let dataUrl;
+  try {
+    dataUrl = off.toDataURL('image/png');
+  } catch (err) {
+    console.error('crop export failed', err);
+    alert('Export failed -- the canvas could not be read (often caused by an externally-loaded image). Try again, or reload the Auto Paint result before exporting.');
+    return;
+  }
   document.getElementById('exportImg').src = dataUrl;
   document.getElementById('exportMeta').textContent = `Crop — ${Math.round(sw)}×${Math.round(sh)}px`;
   document.getElementById('exportOverlay').style.display='flex';
@@ -1547,7 +1554,14 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   }
   const format = document.getElementById('formatSel').value; // 'png' | 'jpeg'
   const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-  const dataUrl = off.toDataURL(mime, 0.92);
+  let dataUrl;
+  try {
+    dataUrl = off.toDataURL(mime, 0.92);
+  } catch (err) {
+    console.error('export failed', err);
+    alert('Export failed -- the canvas could not be read (often caused by an externally-loaded image). Try again, or reload the Auto Paint result before exporting.');
+    return;
+  }
   document.getElementById('exportImg').src = dataUrl;
   document.getElementById('exportMeta').textContent =
     `${pxW}×${pxH}px · ${dpi} DPI · ${Number(wIn.value)}×${Number(hIn.value)}in · ${format.toUpperCase()}` + (bleed>0?' (+0.125" bleed, crop marks)':'');
@@ -1892,7 +1906,12 @@ autoPaintBtn.addEventListener('click', async ()=>{
       autoPaintBtn.disabled = false;
       autoPaintBtn.textContent = 'Auto Paint';
     };
-    autoPaintOverlay.src = data.imageUrl;
+    // Routed through our own origin (see api/proxy-image) rather than set
+    // directly to fal's URL: a cross-origin image, even one fal intends to be
+    // CORS-friendly, can taint the canvas if any redirect or CDN edge along
+    // the way drops the CORS header -- and a tainted canvas fails export's
+    // toDataURL() silently. Same-origin bytes can never taint a canvas.
+    autoPaintOverlay.src = '/api/proxy-image?url=' + encodeURIComponent(data.imageUrl);
   } catch (err) {
     autoPaintHint.textContent = `Auto Paint failed: ${err.message}`;
     autoPaintHint.style.color = '#d87a3d';
