@@ -530,6 +530,7 @@ function stampAt(ctx, stroke, pt, idx){
 // ---------- drawing a whole stroke / whole scene ----------
 function drawStrokePoints(ctx, stroke, fromIdx){
   if (stroke.medium === 'bucketfill'){ drawBucketFillStroke(ctx, stroke); return; }
+  if (stroke.medium === 'moveselect'){ drawMoveSelectStroke(ctx, stroke); return; }
   for(let i=fromIdx;i<stroke.points.length;i++) stampAt(ctx, stroke, stroke.points[i], i);
 }
 const layerScratch = document.createElement('canvas');
@@ -605,7 +606,7 @@ function pressureFor(e, speed){
   return Math.max(0.15, 1-norm);
 }
 // ---------- Move & Crop tools ----------
-let activeTool = 'draw'; // 'draw' | 'move' | 'crop' | 'bucket'
+let activeTool = 'draw'; // 'draw' | 'move' | 'crop' | 'bucket' | 'rectselect'
 let panning = false, panStart = null, panScroll = null;
 let cropping = false, cropStartPt = null;
 const toolMove = document.getElementById('toolMove');
@@ -613,6 +614,8 @@ const toolCrop = document.getElementById('toolCrop');
 const toolCropTile = document.getElementById('toolCropTile');
 const toolBucketTile = document.getElementById('toolBucketTile');
 const bucketHint = document.getElementById('bucketHint');
+const toolRectSelectTile = document.getElementById('toolRectSelectTile');
+const rectSelectHint = document.getElementById('rectSelectHint');
 const cropBox = document.getElementById('cropBox');
 function setTool(t){
   activeTool = (activeTool === t) ? 'draw' : t;
@@ -621,13 +624,17 @@ function setTool(t){
   if (toolCropTile) toolCropTile.classList.toggle('active', activeTool==='crop');
   if (toolBucketTile) toolBucketTile.classList.toggle('active', activeTool==='bucket');
   if (bucketHint) bucketHint.style.display = (activeTool==='bucket') ? 'block' : 'none';
-  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' ? 'crosshair' : (activeTool==='bucket' ? 'crosshair' : 'default'));
+  if (toolRectSelectTile) toolRectSelectTile.classList.toggle('active', activeTool==='rectselect');
+  if (rectSelectHint) rectSelectHint.style.display = (activeTool==='rectselect') ? 'block' : 'none';
+  wrap.style.cursor = activeTool==='move' ? 'grab' : (activeTool==='crop' || activeTool==='bucket' ? 'crosshair' : (activeTool==='rectselect' ? 'crosshair' : 'default'));
   cropBox.style.display = 'none';
+  if (activeTool !== 'rectselect') clearSelection();
 }
 toolMove.addEventListener('click', ()=> setTool('move'));
 toolCrop.addEventListener('click', ()=> setTool('crop'));
 if (toolCropTile) toolCropTile.addEventListener('click', ()=> setTool('crop'));
 if (toolBucketTile) toolBucketTile.addEventListener('click', ()=> setTool('bucket'));
+if (toolRectSelectTile) toolRectSelectTile.addEventListener('click', ()=> setTool('rectselect'));
 
 // ---------- Bucket fill ----------
 // Flood-fills a contiguous region on the ACTIVE layer only, matched against
@@ -704,6 +711,53 @@ function drawBucketFillStroke(ctx, stroke){
   ctx.drawImage(stroke._img, stroke.bx, stroke.by);
 }
 
+// ---------- Rectangular Select & Move ----------
+// Two-step interaction: drag out a rectangle to select it (snapshotting the
+// active layer's pixels under it), then drag again *inside* that selection to
+// move those pixels. The move is stored as a single 'moveselect' stroke that
+// both punches a transparent hole at the original spot and pastes the cut
+// pixels at the new offset, replayed in order with everything else -- so one
+// undo removes the whole move, same as any other stroke.
+let selecting = false, selectStartPt = null;
+let selection = null; // {x,y,w,h} in canvas space, once a selection is committed
+let selDragging = false, selDragStartScreen = null, selDragCurDx = 0, selDragCurDy = 0;
+let selCutDataUrl = null;
+const selectBox = document.getElementById('selectBox');
+const selGhost = document.getElementById('selGhost');
+function clearSelection(){
+  selection = null;
+  selCutDataUrl = null;
+  if (selectBox){ selectBox.style.display = 'none'; selectBox.classList.remove('committed'); }
+  if (selGhost) selGhost.style.display = 'none';
+}
+function finalizeSelection(sx, sy, sw, sh){
+  const x = Math.max(0, Math.round(sx)), y = Math.max(0, Math.round(sy));
+  const w = Math.min(baseW - x, Math.round(sw)), h = Math.min(baseH - y, Math.round(sh));
+  if (w < 4 || h < 4){ clearSelection(); return; }
+  lsctx.clearRect(0,0,layerScratch.width,layerScratch.height);
+  for(const s of strokes){ if(s.layer===activeLayerId) drawStrokePoints(lsctx, s, 0); }
+  const cutCv = document.createElement('canvas'); cutCv.width=w; cutCv.height=h;
+  cutCv.getContext('2d').drawImage(layerScratch, x, y, w, h, 0, 0, w, h);
+  selection = {x, y, w, h};
+  selCutDataUrl = cutCv.toDataURL('image/png');
+  selectBox.classList.add('committed');
+}
+function drawMoveSelectStroke(ctx, stroke){
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillRect(stroke.bx, stroke.by, stroke.w, stroke.h);
+  ctx.restore();
+  if (!stroke._img){
+    const img = new Image();
+    img.onload = ()=>{ stroke._imgReady = true; redrawLiveStrokes(); };
+    img.src = stroke.dataUrl;
+    stroke._img = img;
+    return;
+  }
+  if (!stroke._imgReady) return;
+  ctx.drawImage(stroke._img, stroke.bx+stroke.dx, stroke.by+stroke.dy);
+}
+
 cv.addEventListener('pointerdown', e=>{
   if(activeTool==='move'){
     panning = true; panStart = {x:e.clientX,y:e.clientY};
@@ -725,6 +779,33 @@ cv.addEventListener('pointerdown', e=>{
     performBucketFill(e);
     return;
   }
+  if(activeTool==='rectselect'){
+    if (selection && selectBox.style.display !== 'none'){
+      const br = selectBox.getBoundingClientRect();
+      if (e.clientX>=br.left && e.clientX<=br.right && e.clientY>=br.top && e.clientY<=br.bottom){
+        cv.setPointerCapture(e.pointerId);
+        selDragging = true;
+        selDragStartScreen = {x:e.clientX, y:e.clientY};
+        selDragCurDx = 0; selDragCurDy = 0;
+        selGhost.src = selCutDataUrl;
+        selGhost.style.left = selectBox.style.left;
+        selGhost.style.top = selectBox.style.top;
+        selGhost.style.width = selectBox.style.width;
+        selGhost.style.height = selectBox.style.height;
+        selGhost.style.display = 'block';
+        return;
+      }
+    }
+    cv.setPointerCapture(e.pointerId);
+    clearSelection();
+    selecting = true;
+    const rect = stage.getBoundingClientRect();
+    selectStartPt = {x:e.clientX-rect.left, y:e.clientY-rect.top};
+    selectBox.style.left = selectStartPt.x+'px'; selectBox.style.top = selectStartPt.y+'px';
+    selectBox.style.width = '0px'; selectBox.style.height = '0px';
+    selectBox.style.display = 'block';
+    return;
+  }
   cv.setPointerCapture(e.pointerId);
   const {x,y} = toCanvasXY(e);
   const p = pressureFor(e,0);
@@ -744,6 +825,22 @@ cv.addEventListener('pointermove', e=>{
     const x = Math.min(cropStartPt.x, curX), y = Math.min(cropStartPt.y, curY);
     const w = Math.abs(curX-cropStartPt.x), h = Math.abs(curY-cropStartPt.y);
     cropBox.style.left=x+'px'; cropBox.style.top=y+'px'; cropBox.style.width=w+'px'; cropBox.style.height=h+'px';
+    return;
+  }
+  if(selecting){
+    const rect = stage.getBoundingClientRect();
+    const curX = e.clientX-rect.left, curY = e.clientY-rect.top;
+    const x = Math.min(selectStartPt.x, curX), y = Math.min(selectStartPt.y, curY);
+    const w = Math.abs(curX-selectStartPt.x), h = Math.abs(curY-selectStartPt.y);
+    selectBox.style.left=x+'px'; selectBox.style.top=y+'px'; selectBox.style.width=w+'px'; selectBox.style.height=h+'px';
+    return;
+  }
+  if(selDragging){
+    selDragCurDx = e.clientX - selDragStartScreen.x;
+    selDragCurDy = e.clientY - selDragStartScreen.y;
+    const baseLeft = parseFloat(selectBox.style.left), baseTop = parseFloat(selectBox.style.top);
+    selGhost.style.left = (baseLeft + selDragCurDx) + 'px';
+    selGhost.style.top = (baseTop + selDragCurDy) + 'px';
     return;
   }
   if(!current) return;
@@ -788,6 +885,30 @@ function endStroke(){
     const sw = boxRect.width*scaleX, sh = boxRect.height*scaleY;
     cropBox.style.display='none';
     if(sw>8 && sh>8){ showCropExport(sx,sy,sw,sh); }
+    return;
+  }
+  if(selecting){
+    selecting = false;
+    const rect = cv.getBoundingClientRect();
+    const scaleX = cv.width/rect.width, scaleY = cv.height/rect.height;
+    const boxRect = selectBox.getBoundingClientRect();
+    const sx = (boxRect.left-rect.left)*scaleX, sy=(boxRect.top-rect.top)*scaleY;
+    const sw = boxRect.width*scaleX, sh = boxRect.height*scaleY;
+    if (sw > 8 && sh > 8){ finalizeSelection(sx, sy, sw, sh); }
+    else { clearSelection(); }
+    return;
+  }
+  if(selDragging){
+    selDragging = false;
+    selGhost.style.display = 'none';
+    const rect = cv.getBoundingClientRect();
+    const scaleX = cv.width/rect.width, scaleY = cv.height/rect.height;
+    const canvasDx = Math.round(selDragCurDx * scaleX), canvasDy = Math.round(selDragCurDy * scaleY);
+    if (selection && (Math.abs(canvasDx) > 1 || Math.abs(canvasDy) > 1)){
+      strokes.push({ medium:'moveselect', layer: activeLayerId, bx: selection.x, by: selection.y, w: selection.w, h: selection.h, dx: canvasDx, dy: canvasDy, dataUrl: selCutDataUrl });
+      redrawLiveStrokes();
+    }
+    clearSelection();
     return;
   }
   if(current){ strokes.push(current); current=null; redrawLiveStrokes(); }

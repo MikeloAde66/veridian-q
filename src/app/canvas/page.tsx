@@ -209,6 +209,11 @@ export default function DrawPage() {
   details.menu-sub .grid2{margin:5px 0 8px;}
   #cropBox{position:absolute;left:0;top:0;width:0;height:0;border:2px dashed var(--gold);
     background:rgba(242,185,78,.12);display:none;pointer-events:none;}
+  #selectBox{position:absolute;left:0;top:0;width:0;height:0;border:2px dashed #5cb3ff;
+    background:rgba(92,179,255,.12);display:none;pointer-events:none;}
+  #selectBox.committed{background:rgba(92,179,255,.06);cursor:move;}
+  #selGhost{position:absolute;left:0;top:0;width:0;height:0;display:none;pointer-events:none;
+    outline:2px dashed #5cb3ff;opacity:.92;}
   #rulerOverlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;}
   #rulerReadout{position:absolute;left:0;top:0;pointer-events:none;background:rgba(10,8,5,.82);
     color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:3px 7px;
@@ -388,8 +393,10 @@ export default function DrawPage() {
             <button class="tile" id="toolMagnify" type="button" title="Enlarge small UI text for readability">🔍 Magnify Text</button>
             <button class="tile tool-icon" id="toolCropTile" type="button" title="Crop (drag a region, then Download/Copy it)">⬚ Crop</button>
             <button class="tile tool-icon" id="toolBucketTile" type="button" title="Bucket Fill -- click an area on the active layer to flood-fill it with the current color">🪣 Bucket Fill</button>
+            <button class="tile tool-icon" id="toolRectSelectTile" type="button" title="Rectangular Select &amp; Move -- drag a region, then drag inside it to move those pixels">▭ Select &amp; Move</button>
           </div>
           <div class="hint" id="bucketHint" style="display:none;padding:6px 2px 2px;">Click anywhere on the canvas to flood-fill that area on the active layer.</div>
+          <div class="hint" id="rectSelectHint" style="display:none;padding:6px 2px 2px;">Drag a rectangle to select it, then drag inside the selection to move those pixels. Drag a new rectangle to start over.</div>
         </details>
 
         <details class="menu-cat">
@@ -510,6 +517,8 @@ export default function DrawPage() {
           <div id="rulerOverlay"></div>
           <div id="rulerReadout" style="display:none;"></div>
           <div id="cropBox"></div>
+          <div id="selectBox"></div>
+          <img id="selGhost" alt="" />
         </div>
       </div>
       <div class="zoom-bar">
@@ -677,7 +686,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=27" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=28" strategy="afterInteractive" />
     </>
   );
 }
