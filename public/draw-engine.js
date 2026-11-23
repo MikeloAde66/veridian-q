@@ -1815,7 +1815,23 @@ window.addEventListener('load', bootPaint);
         mctx.drawImage(autoPaintOverlay, dx, dy, dw, dh);
         mctx.globalAlpha = 1;
       }
-      mctx.drawImage(cv, dx, dy, dw, dh);
+      // NOT mctx.drawImage(cv, ...) -- #cv is rendered on screen with CSS
+      // mix-blend-mode:multiply (so strokes visually darken against the
+      // paper underneath), but that blending happens only in the browser's
+      // on-screen compositor and is never baked into cv's own pixel buffer.
+      // Copying cv's raw bitmap here showed strokes in their stark,
+      // unblended stamp colors (stark white/yellow) instead of the actual
+      // blended look (olive/grey) the main canvas correctly shows -- a
+      // cosmetic preview-only bug, not a sign of any stray or leftover
+      // stroke data. Re-stamping from the same source `strokes` array that
+      // export already uses, with globalCompositeOperation:'multiply' set
+      // per-stamp by the stamp functions themselves, keeps this preview a
+      // true match for both the live canvas and the exported file.
+      mctx.save();
+      mctx.translate(dx, dy);
+      mctx.scale(scale, scale);
+      drawLayeredStrokes(mctx);
+      mctx.restore();
       mctx.filter = 'none';
     }catch(e){ /* preview is a convenience, never block the app on it */ }
   }
