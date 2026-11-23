@@ -267,7 +267,7 @@ export default function DrawPage() {
         <button class="icon-btn" id="textureToggle" title="Surface">▦</button>
       </div>
 
-      <div class="color-box open" id="colorBox">
+      <div class="color-box" id="colorBox">
         <h3 class="sec">Color</h3>
         <input type="color" id="colorPicker" value="#1a1a1a">
         <div class="swatches" id="swatches"></div>
@@ -476,7 +476,7 @@ export default function DrawPage() {
     <div class="canvas-area">
       <div class="ref-toolbar">
         <button class="btn" id="refDropdownBtn" style="width:auto;">Reference ▾</button>
-        <div id="refPanel" class="ref-panel open">
+        <div id="refPanel" class="ref-panel">
           <input type="file" id="refFileInput" accept="image/*" style="display:none;">
           <button class="btn" id="importRefBtn" style="width:auto;">Import</button>
           <button class="btn" id="clearRefBtn" style="width:auto;" title="Removes the reference photo and any Auto Paint result -- your painted strokes are untouched">Clear Reference</button>
@@ -655,7 +655,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=24" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=25" strategy="afterInteractive" />
     </>
   );
 }
