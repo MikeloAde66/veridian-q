@@ -29,11 +29,35 @@ type GenerateBody = {
   pigments?: string[]; // active pigment names (e.g. "Burnt Sienna"), mentioned in the prompt
 };
 
+// TEMP SAFETY CAP -- the app has no working sign-in yet (DISABLE_AUTH_GATE is
+// on), so this is a stand-in limit to stop any one visitor from running up
+// unbounded fal.ai spend while testing. Tracked per-browser via an httpOnly
+// cookie, incremented only on a successful generation (failed/rejected
+// requests don't count against the cap). Clearing cookies resets a visitor's
+// count -- an accepted gap for now, not a real auth boundary. Remove this
+// once real sign-in + per-account limits are in place.
+const MAX_GENERATIONS_PER_BROWSER = 5;
+const GENERATION_COUNT_COOKIE = 'aq_gen_count';
+
 export async function POST(req: Request) {
   if (!process.env.FLUX_API_KEY) {
     return NextResponse.json(
       { ok: false, error: 'FLUX_API_KEY is not set in .env.local' },
       { status: 500 }
+    );
+  }
+
+  const cookieHeader = req.headers.get('cookie') || '';
+  const countMatch = cookieHeader.match(new RegExp(`${GENERATION_COUNT_COOKIE}=(\\d+)`));
+  const currentCount = countMatch ? parseInt(countMatch[1], 10) : 0;
+
+  if (currentCount >= MAX_GENERATIONS_PER_BROWSER) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `This browser has reached the ${MAX_GENERATIONS_PER_BROWSER}-image testing limit. Contact the site owner for more.`,
+      },
+      { status: 429 }
     );
   }
 
@@ -184,7 +208,15 @@ export async function POST(req: Request) {
     }
 
     console.log('generate succeeded', outUrl);
-    return NextResponse.json({ ok: true, imageUrl: outUrl, finalPrompt });
+    const response = NextResponse.json({ ok: true, imageUrl: outUrl, finalPrompt });
+    response.cookies.set(GENERATION_COUNT_COOKIE, String(currentCount + 1), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 year -- this is a long-lived per-browser cap, not a session cookie
+    });
+    return response;
   } catch (err) {
     // fal's ApiError puts the real validation detail in `.body` (422s), which
     // console.error alone truncates to "[Object]" in Vercel's log viewer --
