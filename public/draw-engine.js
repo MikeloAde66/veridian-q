@@ -1854,9 +1854,19 @@ autoPaintBtn.addEventListener('click', async ()=>{
     // reference photo is uploaded first to get a real https URL.
     let imageUrl;
     if (withPhoto) {
-      const photoBlob = await (await fetch(refImg.src)).blob();
+      // refImg.src is the 1600px-max copy kept for on-screen display/Trace
+      // clarity -- fal's image-to-image model bills per megapixel of
+      // whatever gets uploaded (currently ~$0.03/MP), and a 1600px photo
+      // rounds up to 3MP ($0.09+/click) for no visible gain: the painted
+      // result abstracts away fine photographic detail regardless, so a
+      // second, further-downscaled copy made just for this upload (~1MP)
+      // produces the same painting at roughly a third of the cost. The
+      // on-screen reference and Trace feature are untouched -- they keep
+      // using refImg.src at full 1600px.
+      const uploadSrc = await resizeImageDataUrl(refImg.src, 1024);
+      const photoBlob = dataUrlToBlob(uploadSrc);
       const form = new FormData();
-      form.append('file', photoBlob, 'reference.png');
+      form.append('file', photoBlob, 'reference.jpg');
       const upRes = await fetch('/api/upload', { method: 'POST', body: form });
       const upData = await safeJson(upRes);
       if (!upRes.ok || !upData.url) throw new Error(upData.error || 'Reference photo upload failed.');
