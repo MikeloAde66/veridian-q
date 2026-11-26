@@ -1564,7 +1564,47 @@ presetSel.addEventListener('change', ()=>{
   if(p.w!=null){ wIn.value=p.w; hIn.value=p.h; dpiIn.value=p.dpi; }
 });
 
+function showSaveBeforeExportPrompt(onDecide){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1a1a1a;color:#eee;border:1px solid #c5a059;border-radius:8px;padding:20px 24px;max-width:360px;text-align:center;';
+  const msg = document.createElement('div');
+  msg.textContent = 'Save this project before exporting? Do this if you plan to come back and make changes later.';
+  msg.style.cssText = 'margin-bottom:16px;line-height:1.4;';
+  box.appendChild(msg);
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;flex-wrap:wrap;';
+  function mkBtn(label, primary){
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label;
+    b.style.cssText = primary
+      ? 'padding:8px 14px;background:#c5a059;color:#1a1a1a;border:none;border-radius:4px;cursor:pointer;font-weight:bold;'
+      : 'padding:8px 14px;background:transparent;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;';
+    return b;
+  }
+  const saveAndExportBtn = mkBtn('Save & Export', true);
+  const exportOnlyBtn = mkBtn('Export Without Saving', false);
+  const cancelBtn = mkBtn('Cancel', false);
+  [saveAndExportBtn, exportOnlyBtn, cancelBtn].forEach(b=>btnRow.appendChild(b));
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  function close(){ overlay.remove(); }
+  saveAndExportBtn.addEventListener('click', async ()=>{
+    saveAndExportBtn.textContent = 'Saving…'; saveAndExportBtn.disabled = true;
+    await saveProject();
+    close();
+    onDecide(true);
+  });
+  exportOnlyBtn.addEventListener('click', ()=>{ close(); onDecide(true); });
+  cancelBtn.addEventListener('click', ()=>{ close(); onDecide(false); });
+}
+
 document.getElementById('exportBtn').addEventListener('click', ()=>{
+  showSaveBeforeExportPrompt((proceed)=>{ if (proceed) runExport(); });
+});
+function runExport(){
   const bleed = document.getElementById('bleedChk').checked ? 0.125 : 0;
   const dpi = Number(dpiIn.value);
   const wInClamped = Math.min(Number(wIn.value), MAX_IN), hInClamped = Math.min(Number(hIn.value), MAX_IN);
@@ -1605,7 +1645,7 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   document.getElementById('exportOverlay').style.display='flex';
   window._lastExportCanvas = off;
   window._lastExportFormat = format;
-});
+}
 document.getElementById('closeExportBtn').addEventListener('click', ()=>{
   document.getElementById('exportOverlay').style.display='none';
 });
@@ -2553,7 +2593,18 @@ document.getElementById('confirmAddProjectBtn').addEventListener('click', ()=>{
 
 // ---------- Autosave: keeps the active project's work in this browser across reloads ----------
 let autosaveTimer = null;
+// Tracks whether there is a change that hasn't actually finished writing to
+// storage yet. This is the thing that made "I refreshed right after I was
+// still looking at it" lose work: saveProject() is async (it awaits an
+// IndexedDB transaction), and a plain beforeunload handler that calls an
+// async function does NOT make the browser wait for it -- the tab can
+// actually unload mid-write. pendingSave lets beforeunload tell the
+// difference between "nothing to lose" and "a write is still in flight",
+// and warn the browser's own "leave site? changes may not be saved" prompt
+// in the latter case, which buys the in-flight write time to land.
+let pendingSave = false;
 function scheduleAutosave(){
+  pendingSave = true;
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(()=>{ saveProject(); }, 600);
 }
@@ -2608,6 +2659,7 @@ async function saveProject(){
     // copy for this project (see restoreProject's migration) -- no reason
     // to keep eating the small quota it was the whole problem in the first place.
     try{ localStorage.removeItem(projectDataKey(activeProjectId)); }catch(e){ /* best-effort */ }
+    pendingSave = false;
     return;
   }catch(e){
     // IndexedDB itself failed (disk genuinely full, a very restrictive
@@ -2623,6 +2675,7 @@ async function saveProject(){
       const p = activeProject();
       if (p) { p.updatedAt = Date.now(); try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e2){} }
       console.warn('[Veridian Q] IndexedDB save failed, fell back to a slimmed-down localStorage save (fills/selections may not restore):', e);
+      pendingSave = false;
     }catch(e2){
       warnSaveFailed(e);
     }
@@ -2679,9 +2732,45 @@ async function restoreProject(){
 ensureProjectsInitialized();
 renderProjectSwitcher();
 restoreProject();
-window.addEventListener('beforeunload', ()=>saveProject());
+window.addEventListener('beforeunload', (e)=>{
+  if (!pendingSave) return; // nothing unsaved -- let the tab close/refresh freely
+  saveProject(); // fire-and-forget: can't be awaited here, but may still land before actual unload
+  // Triggering the browser's native "leave site? changes may not be saved"
+  // prompt is the only way to buy the in-flight write above real time to
+  // finish -- without this, the tab can close mid-write and the save is
+  // lost even though saveProject() was "called".
+  e.preventDefault();
+  e.returnValue = '';
+});
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveProject(); });
 setInterval(()=>saveProject(), 8000);
+
+// ---------- Explicit, visible Save -- a trustworthy manual action alongside autosave ----------
+(function(){
+  const addBtn = document.getElementById('addProjectBtn');
+  if (!addBtn || !addBtn.parentNode) return;
+  const saveBtn = document.createElement('button');
+  saveBtn.id = 'manualSaveBtn';
+  saveBtn.type = 'button';
+  saveBtn.textContent = 'SAVE';
+  saveBtn.title = 'Save this project now';
+  saveBtn.style.cssText = 'margin-left:6px;padding:6px 10px;background:#1a1a1a;color:#c5a059;border:1px solid #c5a059;border-radius:4px;font:12px system-ui,sans-serif;cursor:pointer;';
+  addBtn.parentNode.insertBefore(saveBtn, addBtn.nextSibling);
+  let resetTimer = null;
+  window._manualSaveProject = async function(){
+    clearTimeout(resetTimer);
+    saveBtn.textContent = 'SAVING…';
+    saveBtn.disabled = true;
+    try{
+      await saveProject();
+      saveBtn.textContent = 'SAVED ✓';
+    }catch(e){
+      saveBtn.textContent = 'SAVE FAILED';
+    }
+    resetTimer = setTimeout(()=>{ saveBtn.textContent = 'SAVE'; saveBtn.disabled = false; }, 1500);
+  };
+  saveBtn.addEventListener('click', ()=> window._manualSaveProject());
+})();
 
 // ---------- boot ----------
 function bootPaint(){
