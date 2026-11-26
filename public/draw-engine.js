@@ -1564,6 +1564,41 @@ presetSel.addEventListener('change', ()=>{
   if(p.w!=null){ wIn.value=p.w; hIn.value=p.h; dpiIn.value=p.dpi; }
 });
 
+// Shown when Auto Paint hits the testing-phase generation cap enforced
+// server-side in /api/generate (see that route's MAX_GENERATIONS_PER_BROWSER).
+// This used to just drop the raw error text into the small orange hint line
+// under the button, easy to miss and not really explaining what's going on
+// or what to do about it -- this is the real, deliberate "you're on a demo,
+// here's how to get the real thing" moment, so it gets its own dialog.
+function showTestingLimitModal(message){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1a1a1a;color:#eee;border:1px solid #c5a059;border-radius:8px;padding:20px 24px;max-width:380px;text-align:center;';
+  const title = document.createElement('div');
+  title.textContent = 'Testing phase — Auto Paint limit reached';
+  title.style.cssText = 'font-weight:bold;color:#f2b94e;margin-bottom:10px;';
+  const msg = document.createElement('div');
+  msg.textContent = message || 'Due to the testing phase, only 5 Auto Paint generations are allowed per browser right now. Sign up now to reserve your standard generation pack when we launch.';
+  msg.style.cssText = 'margin-bottom:16px;line-height:1.4;';
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;flex-wrap:wrap;';
+  const signUpBtn = document.createElement('button');
+  signUpBtn.type = 'button'; signUpBtn.textContent = 'Sign Up';
+  signUpBtn.style.cssText = 'padding:8px 14px;background:#c5a059;color:#1a1a1a;border:none;border-radius:4px;cursor:pointer;font-weight:bold;';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button'; closeBtn.textContent = 'Not Now';
+  closeBtn.style.cssText = 'padding:8px 14px;background:transparent;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;';
+  signUpBtn.addEventListener('click', ()=>{ window.location.href = '/'; });
+  closeBtn.addEventListener('click', ()=> overlay.remove());
+  btnRow.appendChild(signUpBtn); btnRow.appendChild(closeBtn);
+  box.appendChild(title); box.appendChild(msg); box.appendChild(btnRow);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+const authBtnEl = document.getElementById('authBtn');
+if (authBtnEl) authBtnEl.addEventListener('click', ()=>{ window.location.href = '/'; });
+
 function showSaveBeforeExportPrompt(onDecide){
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;';
@@ -1963,6 +1998,13 @@ autoPaintBtn.addEventListener('click', async ()=>{
     });
     const data = await safeJson(res);
     if (!data.ok) {
+      if (data.testingLimitReached) {
+        showTestingLimitModal(data.error);
+        autoPaintHint.textContent = DEFAULT_AUTOPAINT_HINT;
+        autoPaintBtn.disabled = false;
+        autoPaintBtn.textContent = 'Auto Paint';
+        return;
+      }
       throw new Error(data.error || `Request failed (${res.status})`);
     }
 

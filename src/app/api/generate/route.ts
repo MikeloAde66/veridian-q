@@ -55,7 +55,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: `This browser has reached the ${MAX_GENERATIONS_PER_BROWSER}-image testing limit. Contact the site owner for more.`,
+        testingLimitReached: true,
+        error: `Due to the testing phase, only ${MAX_GENERATIONS_PER_BROWSER} Auto Paint generations are allowed per browser right now. Sign up now to reserve your standard generation pack when we launch.`,
       },
       { status: 429 }
     );

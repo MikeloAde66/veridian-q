@@ -259,7 +259,7 @@ export default function DrawPage() {
   </svg>
   <header>
     <div class="logo">VERIDIAN <b>Q</b></div>
-    <button type="button" class="auth-btn" id="authBtn" title="Coming soon">Sign Up / Log In</button>
+    <button type="button" class="auth-btn" id="authBtn">Sign Up / Log In</button>
   </header>
   <div class="main">
     <aside class="left">
@@ -695,7 +695,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=37" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=38" strategy="afterInteractive" />
     </>
   );
 }
