@@ -2506,7 +2506,7 @@ document.getElementById('confirmAddProjectBtn').addEventListener('click', ()=>{
   const now = Date.now();
   const id = makeProjectId();
   projects.push({ id, name, description: newProjectDesc.value.trim(), createdAt: now, updatedAt: now });
-  try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ /* best-effort */ }
+  try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ warnSaveFailed(e); }
   closeProjectModal();
   switchToProject(id).catch(e=>warnSaveFailed(e));
 });
@@ -2551,7 +2551,7 @@ async function saveProject(){
   try{
     await idbSet(activeProjectId, cleaned);
     const p = activeProject();
-    if (p) { p.updatedAt = Date.now(); try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ /* best-effort, small payload */ } }
+    if (p) { p.updatedAt = Date.now(); try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ warnSaveFailed(e); } }
     // Once a save lands safely in IndexedDB, drop any legacy localStorage
     // copy for this project (see restoreProject's migration) -- no reason
     // to keep eating the small quota it was the whole problem in the first place.
