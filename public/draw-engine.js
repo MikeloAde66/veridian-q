@@ -1,4 +1,41 @@
 
+// ---------- Global crash banner ----------
+// Installed before anything else in this file runs. If any later line in
+// this script throws during initial setup (not just the storage-specific
+// failures handled further down), that error used to be invisible on a
+// device with no devtools open (an iPad, for instance) -- the script would
+// just silently stop partway through, and whatever ran after the crash
+// (including the Projects/autosave setup near the bottom of the file)
+// would never execute at all. That's indistinguishable, from the user's
+// side, from "nothing ever saves" -- so surface it immediately instead.
+(function(){
+  let shown = false;
+  function showCrashBanner(detail){
+    if (shown) return; shown = true;
+    try{
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#3a2a10;color:#f2d9a0;padding:10px 16px;font:12px/1.4 system-ui,sans-serif;text-align:center;border-bottom:2px solid #c5a059;';
+      bar.textContent = 'Veridian Q hit an error while loading (' + detail + '). Project save/restore may not be working right now -- please screenshot this message.';
+      const closeBtn = document.createElement('span');
+      closeBtn.textContent = ' ✕';
+      closeBtn.style.cssText = 'cursor:pointer;padding:0 6px;font-weight:bold;';
+      closeBtn.addEventListener('click', ()=> bar.remove());
+      bar.appendChild(closeBtn);
+      (document.body || document.documentElement).appendChild(bar);
+    }catch(e){ /* best-effort */ }
+  }
+  window.addEventListener('error', (e)=>{
+    const d = (e.error && (e.error.stack || e.error.message)) || e.message || 'unknown error';
+    console.error('[Veridian Q] uncaught error:', e.error || e.message, 'at', e.filename, ':', e.lineno + ':' + e.colno);
+    showCrashBanner(String(d).slice(0, 180) + ' @' + (e.lineno||'?') + ':' + (e.colno||'?'));
+  });
+  window.addEventListener('unhandledrejection', (e)=>{
+    const d = (e.reason && (e.reason.stack || e.reason.message)) || e.reason || 'unknown rejection';
+    console.error('[Veridian Q] unhandled rejection:', e.reason);
+    showCrashBanner('promise: ' + String(d).slice(0, 180));
+  });
+})();
+
 const baseW = 1000, baseH = 1300;
 const stage = document.getElementById('stage');
 const cv = document.getElementById('cv');
