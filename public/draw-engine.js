@@ -1812,7 +1812,7 @@ refOpacity.addEventListener('input', ()=>{
   refOpVal.textContent = refOpacity.value;
   scheduleAutosave();
 });
-document.getElementById('traceChk').addEventListener('change', e=>{ paperCv.style.opacity = e.target.checked ? 0.32 : 1; });
+document.getElementById('traceChk').addEventListener('change', e=>{ paperCv.style.opacity = e.target.checked ? 0.32 : 1; scheduleAutosave(); });
 
 // ---------- Auto Paint ----------
 const STYLE_PROMPTS = {
@@ -2557,11 +2557,18 @@ function scheduleAutosave(){
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(()=>{ saveProject(); }, 600);
 }
-// Deliberately NOT persisting the reference photo or Auto Paint result here
-// -- this used to be a single shared autosave slot for the whole browser/
-// origin; now each project gets its own slot (projectDataKey above), but a
-// photo loaded mid-session still shouldn't silently reappear on the next
-// visit to the same project, so it stays excluded from what's saved.
+// The reference photo and Auto Paint result ARE persisted (per-project) and
+// restored below. They used to be deliberately excluded: this used to be a
+// single autosave slot shared by the whole browser/origin, so a photo
+// loaded in one tab would silently reappear in any other project -- "the
+// link loaded with someone else's/an old reference, that should be blank".
+// That bug was about the one-shared-slot design, not about restoring the
+// reference at all -- now that every project has its own slot (see
+// projectDataKey/idb above), the correct behavior is for a project to come
+// back exactly as it was left, reference photo included: reopening a
+// project you were painting over a photo with, and finding the canvas and
+// the photo both gone, means re-importing the same photo and redoing all
+// your work from scratch, which is exactly what was being reported.
 //
 // Stored in IndexedDB (see "Project blob storage" above), not localStorage:
 // this is the part of a project that can get large (stroke data, including
@@ -2571,12 +2578,17 @@ function scheduleAutosave(){
 // of being swallowed, which is the whole point of this change.
 async function saveProject(){
   if (!activeProjectId) return;
+  const hasRef = !!(refImg && refImg.src && refImg.style.display !== 'none');
+  const hasAutoPaint = !!(autoPaintOverlay && autoPaintOverlay.src && autoPaintOverlay.style.display !== 'none');
   const data = {
-    v: 1,
+    v: 2,
     strokes, layers, activeLayerId, nextLayerId,
     paperType, medium, variant, color, brushSize,
     activePigmentName,
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
+    ref: hasRef ? { src: refImg.src, opacity: opacityOf(refImg) } : null,
+    autoPaintResult: hasAutoPaint ? { src: autoPaintOverlay.src, opacity: opacityOf(autoPaintOverlay) } : null,
+    traceChecked: (()=>{ const t = document.getElementById('traceChk'); return t ? !!t.checked : false; })(),
   };
   // Strokes can carry transient, non-serializable caches (e.g. a bucket-fill
   // stroke's loaded Image object in _img/_imgReady) -- strip any key starting
@@ -2642,8 +2654,25 @@ async function restoreProject(){
   if(data.brushSize){ brushSize = data.brushSize; sizeSlider.value = brushSize; sizeVal.textContent = brushSize; }
   if(data.activePigmentName !== undefined) activePigmentName = data.activePigmentName;
   if(data.canvasSize && canvasSizeSel){ canvasSizeSel.value = data.canvasSize; renderRuler(); }
-  // Reference photo and Auto Paint result are intentionally never restored
-  // here -- see the comment on saveProject(). Reference always starts blank.
+  // Reference photo and Auto Paint result: restored per-project, same as
+  // everything else above -- see the comment on saveProject() for why this
+  // changed from "never restore" to "restore, now that it's per-project".
+  if (data.ref && data.ref.src){
+    refImg.src = data.ref.src;
+    refImg.style.display = 'block';
+    refImg.style.opacity = data.ref.opacity != null ? data.ref.opacity : 0.5;
+    if (refOpacity) { refOpacity.value = Math.round((data.ref.opacity != null ? data.ref.opacity : 0.5) * 100); refOpVal.textContent = refOpacity.value; }
+  }
+  if (data.autoPaintResult && data.autoPaintResult.src){
+    autoPaintOverlay.src = data.autoPaintResult.src;
+    autoPaintOverlay.style.display = 'block';
+    autoPaintOverlay.style.opacity = data.autoPaintResult.opacity != null ? data.autoPaintResult.opacity : 1;
+    if (refOpacity) { refOpacity.value = Math.round((data.autoPaintResult.opacity != null ? data.autoPaintResult.opacity : 1) * 100); refOpVal.textContent = refOpacity.value; }
+  }
+  if (data.traceChecked != null){
+    const t = document.getElementById('traceChk');
+    if (t) { t.checked = data.traceChecked; t.disabled = false; }
+  }
   renderLayersPanel();
   redrawLiveStrokes();
 }
