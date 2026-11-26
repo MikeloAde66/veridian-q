@@ -504,8 +504,8 @@ export default function DrawPage() {
           <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;">
             <input type="checkbox" id="traceChk" style="width:auto;"> Trace
           </label>
-          <label class="small" style="display:flex;align-items:center;gap:4px;margin:0;" title="Bake the reference photo into the exported file, under your strokes">
-            <input type="checkbox" id="refExportChk" style="width:auto;"> Include in export
+          <label class="small" style="display:none;align-items:center;gap:4px;margin:0;" title="Bake the reference photo into the exported file, under your strokes">
+            <input type="checkbox" id="refExportChk" checked style="width:auto;"> Include in export
           </label>
           <span id="paletteLoading" class="hint" style="display:none;width:100%;">Analyzing reference photo's palette…</span>
           <div id="paletteAnalysis" class="palette-analysis">
@@ -562,7 +562,7 @@ export default function DrawPage() {
         <option value="watercolor">Watercolor</option>
         <option value="acrylic">Acrylic</option>
         <option value="oil-allaprima">Oil — Synthetic</option>
-        <option value="oil-impasto">Oil — Custom</option>
+        <option value="oil-impasto" selected>Oil — Custom</option>
         <option value="monochromatic">Monochromatic</option>
       </select>
 
@@ -695,7 +695,7 @@ export default function DrawPage() {
   </div>
 </div>` }} />
       <Script src="/vendor/mixbox.js?v=1" strategy="beforeInteractive" />
-      <Script src="/draw-engine.js?v=36" strategy="afterInteractive" />
+      <Script src="/draw-engine.js?v=37" strategy="afterInteractive" />
     </>
   );
 }

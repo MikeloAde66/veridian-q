@@ -627,11 +627,11 @@ function fullRedraw(ctx){
 // live-preview compositing, which already does this unconditionally.
 function drawReferenceImg(ctx){
   if (!refImg || refImg.style.display === 'none' || !refImg.src || !refImg.naturalWidth) return;
-  const aiActive = autoPaintOverlay && autoPaintOverlay.style.display === 'block' && autoPaintOverlay.src && autoPaintOverlay.naturalWidth;
-  if (!aiActive){
-    const chk = document.getElementById('refExportChk');
-    if (!chk || !chk.checked) return;
-  }
+  // "Include in export" used to gate this -- it's now always on (per request:
+  // forgetting to check it meant the reference silently dropped out of the
+  // export). The Auto Paint case below already baked it in unconditionally;
+  // this makes the plain-reference case match it instead of depending on a
+  // checkbox someone could forget to tick.
   const iw = refImg.naturalWidth, ih = refImg.naturalHeight;
   const scale = Math.max(baseW/iw, baseH/ih);
   const dw = iw*scale, dh = ih*scale;
