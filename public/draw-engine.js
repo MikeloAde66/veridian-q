@@ -2381,15 +2381,18 @@ async function idbSet(id, value){
 // real problem (e.g. disk genuinely full) surfaces instead of hiding.
 let saveWarningShown = false;
 function warnSaveFailed(reason){
+  const reasonText = (reason && (reason.name || reason.message)) ? (reason.name ? reason.name + (reason.message ? ': ' + reason.message : '') : String(reason.message)) : String(reason);
   console.error('[Veridian Q] autosave failed:', reason);
   if (saveWarningShown) return;
   saveWarningShown = true;
   try{
     const bar = document.createElement('div');
-    bar.textContent = "Couldn't save your last change — your browser may be out of storage space. Export your work now (Export panel) to be safe. ";
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7a1f1f;color:#fff;padding:10px 16px;font:13px/1.4 system-ui,sans-serif;text-align:center;';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#3a2a10;color:#f2d9a0;padding:10px 16px;font:12px/1.4 system-ui,sans-serif;text-align:center;border-bottom:2px solid #c5a059;';
+    const msg = document.createElement('span');
+    msg.textContent = "Couldn't save your last change (" + reasonText + "). Export your work now (Export panel) to be safe.";
+    bar.appendChild(msg);
     const closeBtn = document.createElement('span');
-    closeBtn.textContent = '✕';
+    closeBtn.textContent = ' ✕';
     closeBtn.style.cssText = 'cursor:pointer;padding:0 6px;font-weight:bold;';
     closeBtn.addEventListener('click', ()=> bar.remove());
     bar.appendChild(closeBtn);
@@ -2556,8 +2559,24 @@ async function saveProject(){
     // copy for this project (see restoreProject's migration) -- no reason
     // to keep eating the small quota it was the whole problem in the first place.
     try{ localStorage.removeItem(projectDataKey(activeProjectId)); }catch(e){ /* best-effort */ }
+    return;
   }catch(e){
-    warnSaveFailed(e);
+    // IndexedDB itself failed (disk genuinely full, a very restrictive
+    // private-browsing mode, etc). Last-resort fallback: strip the heavy
+    // embedded dataURLs (bucket-fill/move-select images -- the biggest
+    // single thing in here) and try a smaller localStorage save, so at
+    // least stroke geometry, layers, and settings survive even if a few
+    // fills would need redoing. Only warn if even that fails.
+    try{
+      const slimStrokes = cleaned.strokes.map(s => { if (s && s.dataUrl){ const {dataUrl, ...rest} = s; return rest; } return s; });
+      const slim = { ...cleaned, strokes: slimStrokes, _degraded: true };
+      localStorage.setItem(projectDataKey(activeProjectId), JSON.stringify(slim));
+      const p = activeProject();
+      if (p) { p.updatedAt = Date.now(); try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e2){} }
+      console.warn('[Veridian Q] IndexedDB save failed, fell back to a slimmed-down localStorage save (fills/selections may not restore):', e);
+    }catch(e2){
+      warnSaveFailed(e);
+    }
   }
 }
 async function restoreProject(){
