@@ -2315,8 +2315,87 @@ document.getElementById('adjResetBtn').addEventListener('click', ()=>{
 const LEGACY_AUTOSAVE_KEY = 'vq-autosave-v1'; // the old single-slot key, pre-Projects
 const PROJECTS_KEY = 'vq-projects-v1';
 const ACTIVE_PROJECT_KEY = 'vq-active-project-v1';
-function projectDataKey(id){ return 'vq-project-data-v1:' + id; }
+function projectDataKey(id){ return 'vq-project-data-v1:' + id; } // legacy localStorage key, read for one-time migration only -- see below
 function makeProjectId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+// ---------- Project blob storage: IndexedDB, not localStorage ----------
+// Each project's actual painting data (strokes/layers/etc) used to live in
+// localStorage, one key per project. Strokes from bucket-fill and
+// move/selection tools embed a full-canvas PNG dataURL each -- easily
+// several hundred KB apiece -- and localStorage's whole-origin quota is
+// typically only 5-10MB, shared across every project. Once that filled up,
+// localStorage.setItem started throwing, and the old code caught that error
+// and silently discarded it ("autosave is best-effort, give up quietly").
+// That's precisely what "the fix is saved but doesn't work, I have to start
+// over with each new item" looks like from the outside: saves were quietly
+// failing with no error shown, so nothing a user did after the quota filled
+// up ever actually persisted, new project or old. IndexedDB's quota is far
+// larger (generally hundreds of MB or more) and is built for blobs like
+// this, so the project data itself now lives there; the small registry
+// (project list, which one is active) stays in localStorage since it's
+// tiny and a couple of call sites need to read it synchronously.
+const IDB_NAME = 'vq-projects-db';
+const IDB_STORE = 'projects';
+let idbOpenPromise = null;
+function openProjectsDB(){
+  if (idbOpenPromise) return idbOpenPromise;
+  idbOpenPromise = new Promise((resolve)=>{
+    if (!('indexedDB' in window)){ resolve(null); return; }
+    let req;
+    try{ req = indexedDB.open(IDB_NAME, 1); }catch(e){ resolve(null); return; }
+    req.onupgradeneeded = ()=>{ try{ req.result.createObjectStore(IDB_STORE); }catch(e){ /* already exists */ } };
+    req.onsuccess = ()=> resolve(req.result);
+    // IndexedDB can be unavailable (e.g. some browsers' private-browsing modes) --
+    // resolve(null) rather than reject, so callers fall back instead of breaking.
+    req.onerror = ()=> resolve(null);
+  });
+  return idbOpenPromise;
+}
+async function idbGet(id){
+  const db = await openProjectsDB();
+  if (!db) return undefined;
+  return new Promise((resolve)=>{
+    try{
+      const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(id);
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> resolve(undefined);
+    }catch(e){ resolve(undefined); }
+  });
+}
+async function idbSet(id, value){
+  const db = await openProjectsDB();
+  if (!db) throw new Error('indexeddb-unavailable');
+  return new Promise((resolve, reject)=>{
+    try{
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(value, id);
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error || new Error('indexeddb-write-failed'));
+      tx.onabort = ()=> reject(tx.error || new Error('indexeddb-write-aborted'));
+    }catch(e){ reject(e); }
+  });
+}
+
+// Autosave failures used to be entirely invisible -- the whole point of
+// this change is that they no longer are. Shown once per page load so a
+// real problem (e.g. disk genuinely full) surfaces instead of hiding.
+let saveWarningShown = false;
+function warnSaveFailed(reason){
+  console.error('[Veridian Q] autosave failed:', reason);
+  if (saveWarningShown) return;
+  saveWarningShown = true;
+  try{
+    const bar = document.createElement('div');
+    bar.textContent = "Couldn't save your last change — your browser may be out of storage space. Export your work now (Export panel) to be safe. ";
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7a1f1f;color:#fff;padding:10px 16px;font:13px/1.4 system-ui,sans-serif;text-align:center;';
+    const closeBtn = document.createElement('span');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'cursor:pointer;padding:0 6px;font-weight:bold;';
+    closeBtn.addEventListener('click', ()=> bar.remove());
+    bar.appendChild(closeBtn);
+    document.body.appendChild(bar);
+  }catch(e){ /* best-effort -- never let the warning itself break the app */ }
+}
 
 let projects = [];
 let activeProjectId = null;
@@ -2370,7 +2449,7 @@ function renderProjectSwitcher(){
   activeProjectDesc.style.display = hasDesc ? '' : 'none';
 }
 projectSwitcher.addEventListener('change', ()=>{
-  if (projectSwitcher.value && projectSwitcher.value !== activeProjectId) switchToProject(projectSwitcher.value);
+  if (projectSwitcher.value && projectSwitcher.value !== activeProjectId) switchToProject(projectSwitcher.value).catch(e=>warnSaveFailed(e));
 });
 
 // Resets every piece of in-memory canvas state to a blank starting point --
@@ -2396,13 +2475,13 @@ function resetCanvasStateToBlank(){
   hidePaletteAnalysis();
 }
 
-function switchToProject(id){
+async function switchToProject(id){
   if (!projects.some(p=>p.id===id) || id === activeProjectId) return;
-  saveProject(); // flush whatever was just being worked on before leaving it
+  await saveProject(); // flush whatever was just being worked on before leaving it
   activeProjectId = id;
   try{ localStorage.setItem(ACTIVE_PROJECT_KEY, activeProjectId); }catch(e){ /* best-effort */ }
   resetCanvasStateToBlank();
-  restoreProject();
+  await restoreProject();
   renderProjectSwitcher();
   renderLayersPanel();
   redrawLiveStrokes();
@@ -2429,21 +2508,28 @@ document.getElementById('confirmAddProjectBtn').addEventListener('click', ()=>{
   projects.push({ id, name, description: newProjectDesc.value.trim(), createdAt: now, updatedAt: now });
   try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ /* best-effort */ }
   closeProjectModal();
-  switchToProject(id);
+  switchToProject(id).catch(e=>warnSaveFailed(e));
 });
 
 // ---------- Autosave: keeps the active project's work in this browser across reloads ----------
 let autosaveTimer = null;
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(saveProject, 600);
+  autosaveTimer = setTimeout(()=>{ saveProject(); }, 600);
 }
 // Deliberately NOT persisting the reference photo or Auto Paint result here
 // -- this used to be a single shared autosave slot for the whole browser/
 // origin; now each project gets its own slot (projectDataKey above), but a
 // photo loaded mid-session still shouldn't silently reappear on the next
 // visit to the same project, so it stays excluded from what's saved.
-function saveProject(){
+//
+// Stored in IndexedDB (see "Project blob storage" above), not localStorage:
+// this is the part of a project that can get large (stroke data, including
+// embedded bucket-fill/selection PNGs), and localStorage's small quota was
+// the actual cause of saves silently failing once a project grew. Never
+// throws -- any failure is caught and surfaced via warnSaveFailed() instead
+// of being swallowed, which is the whole point of this change.
+async function saveProject(){
   if (!activeProjectId) return;
   const data = {
     v: 1,
@@ -2452,22 +2538,43 @@ function saveProject(){
     activePigmentName,
     canvasSize: canvasSizeSel ? canvasSizeSel.value : undefined,
   };
+  // Strokes can carry transient, non-serializable caches (e.g. a bucket-fill
+  // stroke's loaded Image object in _img/_imgReady) -- strip any key starting
+  // with '_' so only the real stroke data is persisted. IndexedDB can store
+  // structured objects directly, but running it through this same
+  // stringify/parse round-trip keeps the stripping logic in one place and
+  // keeps the stored shape identical to what it's always been.
+  let cleaned;
   try{
-    // Strokes can carry transient, non-serializable caches (e.g. a bucket-fill
-    // stroke's loaded Image object in _img/_imgReady) -- strip any key starting
-    // with '_' so only the real stroke data is persisted.
-    localStorage.setItem(projectDataKey(activeProjectId), JSON.stringify(data, (k,v)=> (typeof k==='string' && k.startsWith('_')) ? undefined : v));
+    cleaned = JSON.parse(JSON.stringify(data, (k,v)=> (typeof k==='string' && k.startsWith('_')) ? undefined : v));
+  }catch(e){ warnSaveFailed(e); return; }
+  try{
+    await idbSet(activeProjectId, cleaned);
     const p = activeProject();
-    if (p) { p.updatedAt = Date.now(); localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }
-  }catch(e){ /* likely quota exceeded -- autosave is best-effort, give up quietly */ }
+    if (p) { p.updatedAt = Date.now(); try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){ /* best-effort, small payload */ } }
+    // Once a save lands safely in IndexedDB, drop any legacy localStorage
+    // copy for this project (see restoreProject's migration) -- no reason
+    // to keep eating the small quota it was the whole problem in the first place.
+    try{ localStorage.removeItem(projectDataKey(activeProjectId)); }catch(e){ /* best-effort */ }
+  }catch(e){
+    warnSaveFailed(e);
+  }
 }
-function restoreProject(){
+async function restoreProject(){
   if (!activeProjectId) return;
-  let raw;
-  try{ raw = localStorage.getItem(projectDataKey(activeProjectId)); }catch(e){ return; }
-  if(!raw) return;
-  let data;
-  try{ data = JSON.parse(raw); }catch(e){ return; }
+  let data = await idbGet(activeProjectId);
+  if (!data){
+    // One-time migration path: this project's data may still be sitting
+    // under the old single-origin-quota localStorage key from before this
+    // fix. Read it once, and if found, immediately re-save it into
+    // IndexedDB so it stops competing for that scarce localStorage space.
+    let raw;
+    try{ raw = localStorage.getItem(projectDataKey(activeProjectId)); }catch(e){ raw = null; }
+    if (raw){
+      try{ data = JSON.parse(raw); }catch(e){ data = null; }
+      if (data) { idbSet(activeProjectId, data).then(()=>{ try{ localStorage.removeItem(projectDataKey(activeProjectId)); }catch(e){} }).catch(()=>{ /* migration best-effort; legacy copy stays put if this fails */ }); }
+    }
+  }
   if(!data || !Array.isArray(data.strokes)) return;
   strokes = data.strokes;
   if(Array.isArray(data.layers) && data.layers.length) layers = data.layers;
